@@ -1,0 +1,386 @@
+FUNCTION "_SYS_BIC"."BW_CALC_VIEWS.PLANT_MAINTENANCE.SUPPORT::Z_TF_PM_MTTR_MTBF" (IP_CALMONTH NVARCHAR(6)) 
+	RETURNS TABLE(
+	
+			"GEQUIPMNT"  NVARCHAR(18),
+			"GFUNCTLOC"  NVARCHAR(30),
+			"GNOTIFICN"  NVARCHAR(12),
+			"GPLANT"  NVARCHAR(4),
+			"0CALYEAR"  NVARCHAR(4),
+			"0CALMONTH"  NVARCHAR(6),
+			"0CALWEEK"  NVARCHAR(6),			
+			"0CALDAY"  NVARCHAR(8),
+			"4PM_CP12_AUSVN"  NVARCHAR(8),
+			"4PM_CP12_AUZTV"  NVARCHAR(6),
+			"4PM_CP12_AUSBS"  NVARCHAR(8),
+			"4PM_CP12_AUZTB"  NVARCHAR(6),	
+			"4PM_CP12_DWNTM_UNIT"  NVARCHAR(3),
+			"4PM_CP12_DOWN_TIME"  DECIMAL(17,4),
+			"4PM_CP12_DOWN_INDIC"  NVARCHAR(1),
+			"4PM_CP12_NOTIF_ORGN"  NVARCHAR(2),
+			"4PM_CP12_NOT_TYPE"  NVARCHAR(2),
+			
+			"MF_ST_TS" NVARCHAR(20),
+			"MT_END_TS"  NVARCHAR(20),
+			"EQ_NOT_SEQ" NVARCHAR(4),
+			"ST_TS_NEXT_NOT" NVARCHAR(20),
+			"ET_TS_PREV_NOT" NVARCHAR(20),
+			"ST_TS_PREV_NOT" NVARCHAR(20),
+			"ET_TS_NEXT_NOT" NVARCHAR(20),
+			"ADJ_FL" NVARCHAR(2),
+			"EXC_FL" NVARCHAR(2),
+			
+			"MTBF_CALC_FL" NVARCHAR(2),
+			"MTBF_ADJ_ET"  NVARCHAR(20),
+					
+			"TTR" DECIMAL(17,4),
+			"TBF" DECIMAL(17,4),
+			"NOT_CNT" DECIMAL(17,2),
+			
+			"GEQUIPMNT___T"  NVARCHAR(40),
+			"GEQUIPMNT__0ABCINDIC" NVARCHAR(1),
+			"GEQUIPMNT__0ABCINDIC___T" NVARCHAR(20),		
+			"GEQUIPMNT__0EQUITYPE" NVARCHAR(10),
+			"GEQUIPMNT__0EQUITYPE___T" NVARCHAR(20),
+			"GEQUIPMNT__GCOSTCTR" NVARCHAR(10),
+			"GEQUIPMNT__GWRKCTR" NVARCHAR(8),
+			"GEQUIPMNT__GWRKCTR___T" NVARCHAR(20),
+			"GFUNCTLOC___T" NVARCHAR(40),
+			"GNOTIFICN___T" NVARCHAR(40),
+			"GPLANT___T" NVARCHAR(60),
+			"GSRCSYS" NVARCHAR(3)
+			
+			
+			
+			
+	
+			
+	)
+	LANGUAGE SQLSCRIPT
+	SQL SECURITY INVOKER AS
+BEGIN
+/***************************** 
+	Write your function logic
+ *****************************/
+ 
+  --Read notifications
+ lt_notifications =
+ 					SELECT
+		 					"GEQUIPMNT",
+							"GFUNCTLOC",
+							"GNOTIFICN",
+							"0CALYEAR",
+							"GPLANT",
+							"0CALDAY",
+							"4PM_CP12_AUSBS",
+							"4PM_CP12_AUSVN",
+							"4PM_CP12_DWNTM_UNIT",
+							
+							"0CALMONTH",
+							"0CALWEEK",
+							"4PM_CP12_AUZTB",
+							"4PM_CP12_AUZTV",
+							"4PM_CP12_DOWN_INDIC",
+							"4PM_CP12_NOTIF_ORGN",
+							"4PM_CP12_NOT_TYPE",
+							"4PM_CP12_STORNO",
+							SUM("4PM_CP12_DOWN_TIME") AS "4PM_CP12_DOWN_TIME",
+							"GEQUIPMNT___T",
+							"GEQUIPMNT__0ABCINDIC",
+							"GEQUIPMNT__0ABCINDIC___T",
+							"GEQUIPMNT__0EQUITYPE",
+							"GEQUIPMNT__0EQUITYPE___T",
+							"GEQUIPMNT__GCOSTCTR",
+							"GEQUIPMNT__GWRKCTR",
+							"GEQUIPMNT__GWRKCTR___T",
+							"GFUNCTLOC___T",
+							"GNOTIFICN___T",
+							"GPLANT___T",
+							"GSRCSYS"
+							
+							
+
+							FROM "_SYS_BIC"."system-local.bw.bw2hana/PM_CP12"
+							WHERE "0CALMONTH" >= :IP_CALMONTH
+							GROUP BY
+							"GEQUIPMNT",
+							"GFUNCTLOC",
+							"GNOTIFICN",
+							"0CALYEAR",
+							"GPLANT",
+							"0CALDAY",
+							"4PM_CP12_AUSBS",
+							"4PM_CP12_AUSVN",
+							"4PM_CP12_DWNTM_UNIT",
+							
+							"0CALMONTH",
+							"0CALWEEK",
+							"4PM_CP12_AUZTB",
+							"4PM_CP12_AUZTV",
+							"4PM_CP12_DOWN_INDIC",
+							"4PM_CP12_NOTIF_ORGN",
+							"4PM_CP12_NOT_TYPE",
+							"4PM_CP12_STORNO",
+							"GEQUIPMNT___T",							
+							"GEQUIPMNT__0ABCINDIC",
+							"GEQUIPMNT__0ABCINDIC___T",
+							"GEQUIPMNT__0EQUITYPE",
+							"GEQUIPMNT__0EQUITYPE___T",
+							"GEQUIPMNT__GCOSTCTR",
+							"GEQUIPMNT__GWRKCTR",
+							"GEQUIPMNT__GWRKCTR___T",
+							"GFUNCTLOC___T",
+							"GNOTIFICN___T",
+							"GPLANT___T",
+							"GSRCSYS";
+			
+
+	lt_exclusion_flags = 
+						SELECT *,
+								LAG("MF_ADJ_ET") OVER (PARTITION BY "GEQUIPMNT" ORDER BY "4PM_CP12_AUSVN" ASC, "4PM_CP12_AUZTV" ASC, "4PM_CP12_AUSBS" ASC, "4PM_CP12_AUZTB" ASC, "GNOTIFICN" ASC) AS "MTBF_ADJ_ET"
+						FROM
+						(
+						SELECT *,
+								CASE WHEN "EQ_NOT_SEQ"!=1 AND "EXC_FL"!='Y'
+								THEN 'Y'
+								ELSE 'N'
+								END AS "MTBF_CALC_FL",
+								
+								CASE WHEN "ADJ_FL" = 'Y' AND "ET_TS_NEXT_NOT" > "MT_END_TS" AND "ET_TS_NEXT_NOT"!=''
+								THEN "ET_TS_NEXT_NOT"
+								ELSE "MT_END_TS"
+								END AS "MF_ADJ_ET"
+								
+						
+						  FROM(
+						  
+						 SELECT *,
+							    CASE WHEN "EQ_NOT_SEQ"!=1 AND "ST_TS_NEXT_NOT"!='' AND "MT_END_TS" > "ST_TS_NEXT_NOT"
+							    THEN 'Y'
+							    ELSE 'N'
+							    END AS "ADJ_FL",
+							    
+							    CASE WHEN "EQ_NOT_SEQ"!=1 AND "MF_ST_TS" < "ET_TS_PREV_NOT"
+							    THEN 'Y'
+							    ELSE 'N'
+							    END AS "EXC_FL"
+							    
+	
+						FROM
+						(
+						SELECT *, 
+								ROW_NUMBER() OVER (PARTITION BY "GEQUIPMNT" ORDER BY "4PM_CP12_AUSVN" ASC, "4PM_CP12_AUZTV" ASC,"4PM_CP12_AUSBS" ASC, "4PM_CP12_AUZTB" ASC, "GNOTIFICN" ASC) AS "EQ_NOT_SEQ", --Notification sequence in equipment partition
+								LEAD(MF_ST_TS) OVER (PARTITION BY "GEQUIPMNT" ORDER BY "4PM_CP12_AUSVN" ASC, "4PM_CP12_AUZTV" ASC,"4PM_CP12_AUSBS" ASC, "4PM_CP12_AUZTB" ASC, "GNOTIFICN" ASC) AS "ST_TS_NEXT_NOT", -- next in sequence notification start date
+								LAG(MT_END_TS) OVER (PARTITION BY "GEQUIPMNT" ORDER BY "4PM_CP12_AUSVN" ASC, "4PM_CP12_AUZTV" ASC,"4PM_CP12_AUSBS" ASC, "4PM_CP12_AUZTB" ASC, "GNOTIFICN" ASC) AS "ET_TS_PREV_NOT", -- previous in sequence notification end date
+								
+								
+								LAG(MF_ST_TS) OVER (PARTITION BY "GEQUIPMNT" ORDER BY "4PM_CP12_AUSVN" ASC, "4PM_CP12_AUZTV" ASC, "4PM_CP12_AUSBS" ASC, "4PM_CP12_AUZTB" ASC, "GNOTIFICN" ASC) AS "ST_TS_PREV_NOT", -- previous in sequence notification start date
+								LEAD(MT_END_TS) OVER (PARTITION BY "GEQUIPMNT" ORDER BY "4PM_CP12_AUSVN" ASC, "4PM_CP12_AUZTV" ASC, "4PM_CP12_AUSBS" ASC, "4PM_CP12_AUZTB" ASC, "GNOTIFICN" ASC) AS "ET_TS_NEXT_NOT" -- next in sequence notification end date
+								
+								
+								
+								
+							FROM
+						(SELECT 
+							"GEQUIPMNT",
+							"GFUNCTLOC",
+							"GNOTIFICN",
+							"GPLANT",
+							"0CALYEAR",
+							"0CALMONTH",
+							"0CALWEEK",							
+							"0CALDAY",							
+							"4PM_CP12_AUSVN",
+							"4PM_CP12_AUZTV",
+							"4PM_CP12_AUSBS",
+							"4PM_CP12_AUZTB",
+							"4PM_CP12_DWNTM_UNIT",
+							sum("4PM_CP12_DOWN_TIME") AS "4PM_CP12_DOWN_TIME",							
+							"4PM_CP12_DOWN_INDIC",
+							"4PM_CP12_NOTIF_ORGN",
+							"4PM_CP12_NOT_TYPE",
+							"GEQUIPMNT___T",
+							"GEQUIPMNT__0ABCINDIC",
+							"GEQUIPMNT__0ABCINDIC___T",
+							"GEQUIPMNT__0EQUITYPE",
+							"GEQUIPMNT__0EQUITYPE___T",
+							"GEQUIPMNT__GCOSTCTR",
+							"GEQUIPMNT__GWRKCTR",
+							"GEQUIPMNT__GWRKCTR___T",
+							"GFUNCTLOC___T",
+							"GNOTIFICN___T",
+							"GPLANT___T",
+							"GSRCSYS",
+							--CONCAT(CONCAT(TO_DATE("4PM_CP12_AUSVN"),' '),TO_TIME("4PM_CP12_AUZTV")) AS MF_ST_TS,  -- Malfunction start time stamp
+							--LEFT(ADD_SECONDS(TO_TIMESTAMP(CONCAT(CONCAT(TO_DATE("4PM_CP12_AUSVN"),' '),TO_TIME("4PM_CP12_AUZTV"))),sum("4PM_CP12_DOWN_TIME")),19) AS MT_END_TS  -- Malfucntion end timestamp
+							to_nvarchar(CONCAT(CONCAT(TO_DATE("4PM_CP12_AUSVN"),' '),TO_TIME("4PM_CP12_AUZTV")),'YYYYMMDDHH24MISS') AS MF_ST_TS,
+							to_nvarchar(LEFT(ADD_SECONDS(TO_TIMESTAMP(CONCAT(CONCAT(TO_DATE("4PM_CP12_AUSVN"),' '),TO_TIME("4PM_CP12_AUZTV"))),sum("4PM_CP12_DOWN_TIME")),19),'YYYYMMDDHH24MISS') AS MT_END_TS
+							
+									
+							FROM :lt_notifications
+							GROUP BY
+							"GEQUIPMNT",
+							"GFUNCTLOC",
+							"GNOTIFICN",
+							"GPLANT",
+							"0CALYEAR",
+							"0CALMONTH",
+							"0CALWEEK",							
+							"0CALDAY",							
+							"4PM_CP12_AUSVN",
+							"4PM_CP12_AUZTV",
+							"4PM_CP12_AUSBS",
+							"4PM_CP12_AUZTB",
+							"4PM_CP12_DWNTM_UNIT",
+							"4PM_CP12_DOWN_INDIC",
+							"4PM_CP12_NOTIF_ORGN",
+							"4PM_CP12_NOT_TYPE",
+							"GEQUIPMNT___T",
+							"GEQUIPMNT__0ABCINDIC",
+							"GEQUIPMNT__0ABCINDIC___T",
+							"GEQUIPMNT__0EQUITYPE",
+							"GEQUIPMNT__0EQUITYPE___T",
+							"GEQUIPMNT__GCOSTCTR",
+							"GEQUIPMNT__GWRKCTR",
+							"GEQUIPMNT__GWRKCTR___T",
+							"GFUNCTLOC___T",
+							"GNOTIFICN___T",
+							"GPLANT___T",
+							"GSRCSYS"
+							)
+							)
+							)
+							)
+							
+							;
+							
+							
+lt_mttr_mtbf = 
+				SELECT 
+								"GEQUIPMNT",
+								"GFUNCTLOC",
+								"GNOTIFICN",
+								"GPLANT",
+								"0CALYEAR",
+								"0CALMONTH",
+								"0CALWEEK",							
+								"0CALDAY",							
+								"4PM_CP12_AUSVN",
+								"4PM_CP12_AUZTV",
+								"4PM_CP12_AUSBS",
+								"4PM_CP12_AUZTB",
+								"4PM_CP12_DWNTM_UNIT",
+								sum("4PM_CP12_DOWN_TIME") AS "4PM_CP12_DOWN_TIME",							
+								"4PM_CP12_DOWN_INDIC",
+								"4PM_CP12_NOTIF_ORGN",
+								"4PM_CP12_NOT_TYPE",							
+								"MF_ST_TS",
+								"MT_END_TS",
+								"EQ_NOT_SEQ",
+								"ST_TS_NEXT_NOT",
+								"ET_TS_PREV_NOT",
+								"ST_TS_PREV_NOT",
+								"ET_TS_NEXT_NOT",
+								"ADJ_FL",
+								"EXC_FL",
+								"MTBF_CALC_FL",
+								 "MTBF_ADJ_ET",
+								
+								--MTTR calculation
+								/*
+								CASE WHEN "EQ_NOT_SEQ"!=1 AND "EXC_FL"!='Y'
+								THEN							
+                                (DAYS_BETWEEN("MF_ST_TS", "MT_END_TS") * 86400.0
+							    + (TO_DECIMAL(TO_VARCHAR("MT_END_TS", 'SSSSS.FF7'), 15, 7)
+							    - TO_DECIMAL(TO_VARCHAR("MF_ST_TS", 'SSSSS.FF7'), 15, 7)))/3600
+							    ELSE 0 end AS "MTTR",
+							    */
+								
+								CASE WHEN "EQ_NOT_SEQ"!=1 AND "EXC_FL"!='Y'
+								THEN							
+                                ABS(SECONDS_BETWEEN("MF_ST_TS", "MT_END_TS")/3600)
+							    ELSE 0 end AS "TTR",    -- time to Repair
+    							
+    							-- MTBF calculation
+    							/*
+    							CASE WHEN "MTBF_CALC_FL"='Y'
+    							THEN							
+                                (DAYS_BETWEEN("MF_ST_TS","MTBF_ADJ_ET") * 86400.0
+							    + (TO_DECIMAL(TO_VARCHAR("MTBF_ADJ_ET", 'SSSSS.FF7'), 15, 7)
+							    - TO_DECIMAL(TO_VARCHAR("MF_ST_TS", 'SSSSS.FF7'), 15, 7)))/3600
+							    ELSE 0 end AS "MTBF"
+							    */
+							    
+							    CASE WHEN "MTBF_CALC_FL"='Y'
+    							THEN							
+                                ABS(SECONDS_BETWEEN("MF_ST_TS","MTBF_ADJ_ET")/3600)						    
+							    ELSE 0 end AS "TBF",    -- time between failures
+							    
+							    CASE WHEN "MTBF_CALC_FL"='Y'
+    							THEN							
+                                1						    
+							    ELSE 0 end AS "NOT_CNT",  -- notification count
+							    "GEQUIPMNT___T",
+								"GEQUIPMNT__0ABCINDIC",
+								"GEQUIPMNT__0ABCINDIC___T",
+								"GEQUIPMNT__0EQUITYPE",
+								"GEQUIPMNT__0EQUITYPE___T",
+								"GEQUIPMNT__GCOSTCTR",
+								"GEQUIPMNT__GWRKCTR",
+								"GEQUIPMNT__GWRKCTR___T",
+								"GFUNCTLOC___T",
+								"GNOTIFICN___T",
+								"GPLANT___T",
+								"GSRCSYS"
+							    
+							    
+							    
+							    
+							    from :lt_exclusion_flags
+							    
+							    GROUP BY
+							    "GEQUIPMNT",
+							"GFUNCTLOC",
+							"GNOTIFICN",
+							"GPLANT",
+							"0CALYEAR",
+							"0CALMONTH",
+							"0CALWEEK",							
+							"0CALDAY",							
+							"4PM_CP12_AUSVN",
+							"4PM_CP12_AUZTV",
+							"4PM_CP12_AUSBS",
+							"4PM_CP12_AUZTB",
+							"4PM_CP12_DWNTM_UNIT",													
+							"4PM_CP12_DOWN_INDIC",
+							"4PM_CP12_NOTIF_ORGN",
+							"4PM_CP12_NOT_TYPE",
+							"MF_ST_TS",
+							"MT_END_TS",
+							"EQ_NOT_SEQ",
+							"ST_TS_NEXT_NOT",
+							"ET_TS_PREV_NOT",
+							"ST_TS_PREV_NOT",
+							"ET_TS_NEXT_NOT",
+							"ADJ_FL",
+							"EXC_FL",
+							"MTBF_CALC_FL",
+							"MTBF_ADJ_ET",
+							"GEQUIPMNT___T",
+							"GEQUIPMNT__0ABCINDIC",
+							"GEQUIPMNT__0ABCINDIC___T",
+							"GEQUIPMNT__0EQUITYPE",
+							"GEQUIPMNT__0EQUITYPE___T",
+							"GEQUIPMNT__GCOSTCTR",
+							"GEQUIPMNT__GWRKCTR",
+							"GEQUIPMNT__GWRKCTR___T",
+							"GFUNCTLOC___T",
+							"GNOTIFICN___T",
+							"GPLANT___T",
+							"GSRCSYS";
+							    
+						
+							
+RETURN
+SELECT * FROM :lt_mttr_mtbf;					
+ 
+END;

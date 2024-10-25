@@ -1,0 +1,95 @@
+CREATE PROCEDURE "DATA_QUALITY_ALERT"."P_CUST_PROF_VOLUME_DQN_R" (
+												 in  lv_busseg nvarchar(4),
+												 out v_final_predict T_CUST_PROF_PAL_ARIMA_PREDICT, 
+												 out v_model T_CUST_PROF_PAL_ARIMA_MODEL_TBL, 
+												 out v_fitted T_CUST_PROF_PAL_ARIMA_FITL) 
+	LANGUAGE SQLSCRIPT
+	SQL SECURITY INVOKER 
+	DEFAULT SCHEMA DATA_QUALITY_ALERT
+	READS SQL DATA AS
+	BEGIN
+	
+	declare v_auto_number_cust_prof_forcast_data T_FORECAST_CUST_PROF_DATE_RANGES;
+	declare v_f_params T_CUST_PROF_PAL_ARIMA_F_PARAMETER_TBL;
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+	       SELECT ::SQL_ERROR_CODE, ::SQL_ERROR_MESSAGE FROM DUMMY;
+	       
+	
+	v_params   = SELECT * from CUST_PROF_PAL_ARIMA_PARAMETER_TBL;
+
+
+	
+	call P_PREPARE_CUST_PROF_GREPQTYBU_FORECAST_DATA(v_auto_number_cust_prof_forcast_data,v_f_params);
+	
+	
+	--Generate a table with ALL dates so that missing dates with ZERO qty can be added
+	v_cust_prof_date_ranges = 
+ 		SELECT to_date(GENERATED_PERIOD_START) as "GENERATED_DATE" , 0 as "rep_qty" 
+    	FROM SERIES_GENERATE_TIMESTAMP('INTERVAL 1 DAY', '01.01.2018',  TO_VARCHAR (TO_DATE(current_date), 'DD.MM.YYYY'));
+	
+	v_H9P_cust_prof_data =
+		SELECT TO_date("FICP_CP02_CALC_GLOBAL"."Z_Date", 'mm/dd/yyyy') as "Z_DATE", sum("FICP_CP02_CALC_GLOBAL"."GREPQTYBU") as "GREPQTYBU"
+		FROM  "_SYS_BIC"."BW_CALC_VIEWS/FICP_CP02_CALC_GLOBAL" "FICP_CP02_CALC_GLOBAL"  --"ORDER_FAILURE"."FICP_CP02_CALC_GLOBAL" 
+		WHERE 
+		(("0CALYEAR" > '2017')) 		
+		--AND "0CALMONTH" <=  TO_VARCHAR (TO_DATE(current_date), 'YYYYMM') 
+		AND (("0RECTYPE" IN ('F','M'))) 
+		AND (("0CURTYPE___T" IN ('Group Currency (USD)'))) 
+	    --business segment user input
+		AND (("GOMGK__GBUSSEG" IN (:lv_busseg)))
+		--Reporting Qty UOM of respective business segment
+		AND "0TARGET_QU" IN (select "REPUOM" from "DATA_QUALITY_ALERT"."BUSSEG_REPUOM_TBL" WHERE "BUSSEG" IN (:lv_busseg))
+			  
+		group by "FICP_CP02_CALC_GLOBAL"."Z_Date" 
+		order by "FICP_CP02_CALC_GLOBAL"."Z_Date" ;
+
+	v_cust_prof_data =
+		select "Z_DATE", sum("GREPQTYBU") as "GREPQTYBU"
+		from :v_H9P_cust_prof_data 
+		group by "Z_DATE"
+		union 		----All dates are needed including weekends
+		select "GENERATED_DATE" as "Z_DATE" ,0 as "GREPQTYBU"  
+		from :v_cust_prof_date_ranges
+		where "GENERATED_DATE" not in (select distinct("Z_DATE") from :v_H9P_cust_prof_data) 
+		order by "Z_DATE";
+		
+	--for past 15 days send ZERO GREPQTYBU, so that it can be forcasted. This will help to compare  with the forcast data
+	v_remove_past_15 = 
+		SELECT DISTINCT "Z_DATE", "GREPQTYBU"
+		FROM :v_cust_prof_data
+		where "Z_DATE" < (select min("Z_DATE") from :v_auto_number_cust_prof_forcast_data)
+		ORDER BY "Z_DATE";		
+		
+	v_auto_number_cust_prof_data =
+		SELECT DISTINCT "Z_DATE", "GREPQTYBU" as "Xreg", ROW_NUMBER() OVER (ORDER BY "Z_DATE") AUTO_ID
+		FROM :v_remove_past_15
+		ORDER BY "Z_DATE", AUTO_ID;
+		
+	v_source = 
+		select TO_INT("AUTO_ID") as "TIMESTAMP", TO_DOUBLE("Xreg") as "Xreg" 
+		from :v_auto_number_cust_prof_data;
+
+--Call model
+	CALL _SYS_AFL.PAL_AUTOARIMA(:v_source, :v_params, v_model, v_fitted);
+	
+	CALL CUST_PROF_PAL_ARIMAFORECAST_PROC(:v_model, :v_f_params, v_predict);
+
+	v_final_predict_1 =
+		select *, ROW_NUMBER() OVER (ORDER BY "TIME") predict_AUTO_ID
+		from :v_predict
+		order by "TIME", predict_AUTO_ID;
+	
+	v_final_predict_2 =
+		select F."Z_DATE", P.* 
+		from  :v_final_predict_1 P
+		INNER JOIN :v_auto_number_cust_prof_forcast_data F ON F. "AUTO_ID" = P.predict_AUTO_ID
+		order by F."Z_DATE";	
+
+	v_final_predict =
+		select P.*, case when C."GREPQTYBU" IS NULL then 0 else C."GREPQTYBU" end AS "ACTUAL_GREPQTYBU"  
+		from  :v_final_predict_2 P
+		INNER JOIN :v_cust_prof_data C ON P."Z_DATE" = C."Z_DATE"
+		order by P."Z_DATE";
+
+	
+END;

@@ -1,0 +1,260 @@
+METHOD PROCEDURE BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT OPTIONS READ-ONLY USING /BIC/PGPLANT /BIC/PLPLNTXREF /BIC/PLPRCTXREF /BIC/PLMATXREF /BIC/PLCOELXREF /BIC/PLVENDXREF /BIC/PGMAT_PLNT.
+
+--Global master data flip logic tables
+
+LT_PL_CC = SELECT DISTINCT "/BIC/GPLANT", "/BIC/GCOMP_CD" FROM "/BIC/PGPLANT" WHERE "/BIC/GSRCSYS" ='E6P' AND "/BIC/GPLANT" IN (SELECT DISTINCT "/BIC/LPLNTXREF" FROM :INTAB);
+LT_PLNT_XREF = SELECT DISTINCT "/BIC/LPLNTXREF", "/BIC/GPLANT" FROM "/BIC/PLPLNTXREF" WHERE "/BIC/GSRCSYS" ='E6P' AND "/BIC/LPLNTXREF" IN (SELECT DISTINCT "/BIC/LPLNTXREF" FROM :INTAB);
+LT_PRCTR = SELECT DISTINCT "/BIC/LPRCTXREF", "/BIC/GPROF_CTR" FROM "/BIC/PLPRCTXREF" WHERE "/BIC/GSRCSYS" ='E6P'AND "/BIC/LPRCTXREF" IN (SELECT DISTINCT "/BIC/LPRCTXREF" FROM :INTAB);
+LT_MAT = SELECT DISTINCT "/BIC/LMATXREF", "/BIC/GMATERIAL" FROM "/BIC/PLMATXREF" WHERE "/BIC/GSRCSYS" ='E6P' AND "/BIC/LMATXREF" IN (SELECT DISTINCT "/BIC/LMATXREF" FROM :INTAB);
+LT_INMAT = SELECT DISTINCT "/BIC/LMATXREF", "/BIC/GMATERIAL" FROM "/BIC/PLMATXREF" WHERE "/BIC/GSRCSYS" ='E6P' AND "/BIC/LMATXREF" IN (SELECT DISTINCT "/BIC/LINMTXREF" FROM :INTAB);
+LT_COEL = SELECT DISTINCT "/BIC/LCOELXREF", "/BIC/GCOSTELMT" FROM "/BIC/PLCOELXREF" WHERE "/BIC/GSRCSYS" ='E6P' AND "/BIC/LCOELXREF" IN (SELECT DISTINCT "/BIC/LCOELXREF" FROM :INTAB);
+LT_VEND = SELECT DISTINCT "/BIC/LVENDXREF", "/BIC/GVENDOR" FROM "/BIC/PLVENDXREF" WHERE "/BIC/GSRCSYS" ='E6P' AND "/BIC/LVENDXREF" IN (SELECT DISTINCT "/BIC/LVENDXREF" FROM :INTAB);
+LT_GMAT_PLNT = SELECT DISTINCT "/BIC/GPLANT","/BIC/GMAT_PLNT", "/BIC/GPROF_CTR" FROM "/BIC/PGMAT_PLNT" WHERE "/BIC/GPLANT" IN (SELECT DISTINCT "/BIC/LPLNTXREF" FROM :INTAB) AND "/BIC/GMAT_PLNT" IN (SELECT DISTINCT "/BIC/GMATERIAL" FROM :LT_MAT);
+/*
+LT_EUR = SELECT
+                 "4ZFX_CP01_FCURR" AS "FCURR",
+                 to_nvarchar(99999999 - "4ZFX_CP01_GDATU") as "DATE_CONV",
+                 LEFT(to_nvarchar(99999999 - "4ZFX_CP01_GDATU"),4) AS "YEAR",
+                 "4ZFX_CP01_KURST" AS "KURST",
+                 "4ZFX_CP01_TCURR" AS "TCURR",
+                 sum("4ZFX_CP01_FFACT") AS "FFACT",
+                 sum("4ZFX_CP01_TFACT") AS "TFACT",
+                 1/sum("4ZFX_CP01_UKURS") AS "USD_TO_EUR"
+                    FROM "_SYS_BIC"."system-local.bw.bw2hana/ZFX_CP01"  CUR
+                                    WHERE "4ZFX_CP01_KURST" = 'P' AND "4ZFX_CP01_FCURR" = 'EUR'
+
+                              GROUP BY
+                                 "4ZFX_CP01_FCURR",
+                                 "4ZFX_CP01_GDATU",
+                                 "4ZFX_CP01_KURST",
+                                 "4ZFX_CP01_TCURR";
+                                 */
+
+
+ LT_IN_MT_PLNT= SELECT
+                SRC."ZSOURCE",
+                SRC."MEINS",
+                SRC.CALYEAR,
+                SRC."HWAER",
+                SRC."FWAER_KPF",
+                SRC."FWAER",
+                SRC.CALQUARTER,
+                SRC.CALMONTH,
+                SRC."/BIC/GMATERIAL",
+                SRC."COSTVERS",
+                SRC."/BIC/GMTORGGRP",
+                SRC."COSTOPE",
+                SRC."COSTSTATUS",
+                SRC."COSTDATE",
+                SRC."COSTLEVEL",
+                SRC."COSTPOS",
+                SRC."PCPITEMCAT",
+                SRC."PCP_RES",
+                SRC."COSTDATE1",
+                SRC."COSTDATE2",
+                SRC."COSTVAR",
+                SRC."PRZNR",
+                SRC."/BIC/LCOELXREF",
+                SRC."/BIC/GSRCSYS",
+                SRC."/BIC/GMLCSTCMP",
+                SRC."CCOMPSTRUC",
+                SRC."COSTNUM",
+                SRC."/BIC/LPLNTXREF",
+                SRC."/BIC/LMATXREF",
+                SRC."/BIC/LCOCTXREF",
+                SRC."/BIC/LVENDXREF",
+                SRC."/BIC/LCOARXREF",
+                SRC."/BIC/GPROF_CTR",
+                SRC."/BIC/GCOMP_CD",
+                SRC."/BIC/GOMGK",
+                SRC."/BIC/GMAT_VAL",
+                MT."/BIC/GMATERIAL" AS "/BIC/GMAT_PLNT",
+                SRC."/BIC/GINMATRL",
+                SRC."/BIC/GINMATVAL",
+                SRC."/BIC/GVAL_TYPE",
+                SRC."ID_VALAREA",
+                SRC."/BIC/GCOSTELMT",
+                SRC."/BIC/GCO_AREA",
+                SRC."/BIC/GVENDOR",
+                SRC."/BIC/GWRKCTR",
+                SRC."/BIC/GPLANT",
+                SRC."INFO_REC",
+                SRC."/BIC/GPURCHORG",
+                SRC."CURRENCY",
+                SRC."LOC_CURRCY",
+                SRC."/BIC/LPRCTXREF",
+                SRC."P_PLANT",
+                SRC."/BIC/LINMTXREF",
+                SRC."/BIC/LMTYPXREF",
+                SRC."LSTAR",
+                SRC."STPOS",
+                SRC."FEHLK",
+                SRC."PSKNZ",
+                SRC."AUSPROZ",
+                SRC."WAERS",
+                SRC."MEEHT",
+                SRC."PMEHT",
+                SRC."LTEXT",
+                SRC."AUSME",
+                SRC."SICHT",
+                SRC."RECORDMODE",
+
+                SRC."AMT_EUR",
+
+                SRC."WERTN",
+                SRC."WRTFW_KPF",
+                SRC."WRTFW_POS",
+                SRC."LOSGR",
+
+                SRC."PRIC_V_PCP",
+                SRC."PRIC_F_PCP",
+                SRC."PRIC_PCP",
+                SRC."AMOUNTVR",
+                SRC."AMOUNTFX",
+                SRC."AMOUNT",
+                SRC."MENGE",
+                SRC."AUSMG",
+                SRC."AUSMGKO",
+                SRC."AMENG",
+                SRC."SCRAK_C",
+                SRC."SCRAP_C",
+                SRC."RECORD",
+                SRC."SQL__PROCEDURE__SOURCE__RECORD" FROM :INTAB SRC LEFT JOIN :LT_MAT MT ON SRC."/BIC/LMATXREF" = MT."/BIC/LMATXREF";
+
+
+
+LT_RESULT = SELECT
+                SRC."ZSOURCE",
+                SRC."MEINS",
+                SRC.CALYEAR,
+                SRC."HWAER",
+                SRC."FWAER_KPF",
+                SRC."FWAER",
+                SRC.CALQUARTER,
+                SRC.CALMONTH,
+                MT."/BIC/GMATERIAL" AS "/BIC/GMATERIAL",
+                SRC."COSTVERS",
+                SRC."/BIC/GMTORGGRP",
+                SRC."COSTOPE",
+                SRC."COSTSTATUS",
+                SRC."COSTDATE",
+                SRC."COSTLEVEL",
+                SRC."COSTPOS",
+                SRC."PCPITEMCAT",
+                SRC."PCP_RES",
+                SRC."COSTDATE1",
+                SRC."COSTDATE2",
+                SRC."COSTVAR",
+                SRC."PRZNR",
+                SRC."/BIC/LCOELXREF",
+                SRC."/BIC/GSRCSYS",
+                SRC."/BIC/GMLCSTCMP",
+                SRC."CCOMPSTRUC",
+                SRC."COSTNUM",
+                SRC."/BIC/LPLNTXREF",
+                SRC."/BIC/LMATXREF",
+                SRC."/BIC/LCOCTXREF",
+                SRC."/BIC/LVENDXREF",
+                SRC."/BIC/LCOARXREF",
+
+                IFNULL(MT_PLNT."/BIC/GPROF_CTR",'') AS "/BIC/GPROF_CTR",
+
+                IFNULL(CC."/BIC/GCOMP_CD",'') AS "/BIC/GCOMP_CD",
+                ABAP_ALPHANUM(CONCAT(IFNULL(CC."/BIC/GCOMP_CD",''),IFNULL(MT_PLNT."/BIC/GPROF_CTR",'')),'26') AS "/BIC/GOMGK",
+
+                ABAP_ALPHANUM(MT."/BIC/GMATERIAL",'18') AS "/BIC/GMAT_VAL",
+                SRC."/BIC/GMAT_PLNT",
+                INMAT."/BIC/GMATERIAL" AS "/BIC/GINMATRL",
+                ABAP_ALPHANUM(INMAT."/BIC/GMATERIAL",'18') AS "/BIC/GINMATVAL",
+                SRC."/BIC/GVAL_TYPE",
+                PL."/BIC/GPLANT" AS "ID_VALAREA",
+                IFNULL(ABAP_ALPHANUM(COEL."/BIC/GCOSTELMT",'10'),'') AS "/BIC/GCOSTELMT",
+                SRC."/BIC/LCOARXREF" AS "/BIC/GCO_AREA",
+                IFNULL(ABAP_ALPHANUM(VEND."/BIC/GVENDOR", '10'),'')  AS "/BIC/GVENDOR",
+                SRC."/BIC/GWRKCTR",
+
+                PL."/BIC/GPLANT" AS "/BIC/GPLANT",
+
+                SRC."INFO_REC",
+                SRC."/BIC/GPURCHORG",
+                SRC."CURRENCY",
+                SRC."LOC_CURRCY",
+                SRC."/BIC/LPRCTXREF",
+                SRC."P_PLANT",
+                SRC."/BIC/LINMTXREF",
+                SRC."/BIC/LMTYPXREF",
+                SRC."LSTAR",
+                SRC."STPOS",
+                SRC."FEHLK",
+                SRC."PSKNZ",
+                SRC."AUSPROZ",
+                SRC."WAERS",
+                SRC."MEEHT",
+                SRC."PMEHT",
+                SRC."LTEXT",
+                SRC."AUSME",
+                SRC."SICHT",
+                SRC."RECORDMODE",
+
+                CASE WHEN SRC."CURRENCY" = 'EUR' THEN IFNULL(SRC."AMOUNT",0)
+                ELSE
+                    IFNULL(
+                    CONVERT_CURRENCY(
+                      AMOUNT          => SRC."AMOUNT",
+                      SCHEMA          => 'SAPABAP1',
+                      CLIENT          => '100',
+                      SOURCE_UNIT     =>  SRC."CURRENCY",
+                      TARGET_UNIT     => 'EUR',
+                      CONVERSION_TYPE => 'P',
+                      REFERENCE_DATE  =>  SRC."COSTDATE1",
+                      ERROR_HANDLING  =>'set to null'
+                    ),0) END AS "AMT_EUR",
+
+                SRC."WERTN",
+                SRC."WRTFW_KPF",
+                SRC."WRTFW_POS",
+                SRC."LOSGR",
+
+                SRC."PRIC_V_PCP",
+                SRC."PRIC_F_PCP",
+                SRC."PRIC_PCP",
+                SRC."AMOUNTVR",
+                SRC."AMOUNTFX",
+                SRC."AMOUNT",
+                SRC."MENGE",
+                SRC."AUSMG",
+                SRC."AUSMGKO",
+                SRC."AMENG",
+                SRC."SCRAK_C",
+                SRC."SCRAP_C",
+                SRC."RECORD",
+                SRC."SQL__PROCEDURE__SOURCE__RECORD"
+
+            FROM :LT_IN_MT_PLNT SRC LEFT JOIN :LT_PL_CC CC ON
+                    SRC."/BIC/LPLNTXREF" = CC."/BIC/GPLANT"
+                    LEFT JOIN :LT_PLNT_XREF PL ON
+                    SRC."/BIC/LPLNTXREF" = PL."/BIC/LPLNTXREF"
+                    LEFT JOIN :LT_PRCTR PC ON
+                    SRC."/BIC/LPRCTXREF" = PC."/BIC/LPRCTXREF"
+                    LEFT JOIN :LT_MAT MT ON
+                    SRC."/BIC/LMATXREF" = MT."/BIC/LMATXREF"
+                    LEFT JOIN :LT_INMAT INMAT ON
+                    SRC."/BIC/LINMTXREF" = INMAT."/BIC/LMATXREF"
+                    LEFT JOIN :LT_COEL COEL ON
+                    SRC."/BIC/LCOELXREF" = COEL."/BIC/LCOELXREF"
+                    LEFT JOIN :LT_VEND VEND ON
+                    SRC."/BIC/LVENDXREF" = VEND."/BIC/LVENDXREF"
+                    LEFT JOIN :LT_GMAT_PLNT MT_PLNT ON
+                    SRC."/BIC/LPLNTXREF" = MT_PLNT."/BIC/GPLANT" AND SRC."/BIC/GMAT_PLNT" = MT_PLNT."/BIC/GMAT_PLNT"
+                    ;
+                    --LEFT JOIN :LT_EUR ER ON
+                    --SRC.CALYEAR = ER."YEAR";
+
+
+OUTTAB   = SELECT * FROM :LT_RESULT;
+
+--OUTTAB   = SELECT * FROM :INTAB;
+
+
+ERRORTAB = SELECT '' AS ERROR_TEXT, '' AS SQL__PROCEDURE__SOURCE__RECORD FROM DUMMY WHERE DUMMY <> 'X';
+ENDMETHOD.

@@ -1,0 +1,3312 @@
+CREATE PROCEDURE "PVM"."PriceVolumeMix_R" ( 
+	IN Calendar_Year_Month_AP nvarchar(5000),
+	IN Calendar_Year_Month_BP nvarchar(5000),
+	IN GSAPID nvarchar(50),
+	IN Business_Group nvarchar(5000),
+	IN Business_Unit nvarchar(5000),
+	IN Business_Segment nvarchar(5000),
+	IN Country_key nvarchar(5000),
+	IN PVM_Product_Group nvarchar(5000),
+	IN PVM_Customer_Channel_Group nvarchar(5000),
+	IN CSB_ES_Markets nvarchar(5000),
+	IN CSB_ES_Sub_Markets nvarchar(5000),
+	IN IC_Business_Segment nvarchar(5000),
+	IN Global_Customer_Group nvarchar(5000),
+	IN Prod_Hier_1 nvarchar(5000),
+	IN Prod_Hier_2 nvarchar(5000),
+	IN Prod_Hier_3 nvarchar(5000),
+	IN debugflag   nvarchar(1),
+   OUT outtab "tt_PriceVolumeMix")  
+LANGUAGE SQLSCRIPT 
+SQL SECURITY INVOKER 
+DEFAULT SCHEMA PVM 
+READS SQL DATA 
+AS
+	RUNID BIGINT;
+	Sales_Region nvarchar(5000);
+	Sales_Territory nvarchar(5000);
+	GSAPID_Clean varchar(50);
+BEGIN
+
+IF LEFT(:GSAPID, 1) = '@' THEN
+	Calendar_Year_Month_AP := 'A201603';
+	Calendar_Year_Month_BP := 'A201602';
+	GSAPID			 := 'LIK3';
+	Business_Group 	 := '1001';
+	Business_Unit  	 := '2024';
+	Business_Segment := '3055';
+	Country_key		 := 'US';
+	PVM_Product_Group := '130101';
+	PVM_Customer_Channel_Group := '50005B30';
+	CSB_ES_Markets 	    := 'ALL';
+	CSB_ES_Sub_Markets  := 'ALL';
+	IC_Business_Segment := '0000';
+	Global_Customer_Group := '50005';
+	Prod_Hier_1 := '13';
+	Prod_Hier_2 := '1301';
+	Prod_Hier_3 := '130101';
+	debugflag   := 1;
+END IF;
+
+Sales_Territory := 'ALL';
+Sales_Region    := 'ALL';
+GSAPID_Clean 	:= "fn_SAPID"(:GSAPID);
+
+Calendar_Year_Month_AP      := REPLACE(REPLACE(REPLACE(:Calendar_Year_Month_AP, '(', ''), ')', ''), '''', '');
+Calendar_Year_Month_BP      := REPLACE(REPLACE(REPLACE(:Calendar_Year_Month_BP, '(', ''), ')', ''), '''', '');
+Business_Group              := REPLACE(REPLACE(REPLACE(:Business_Group, '(', ''), ')', ''), '''', '');
+Business_Unit               := REPLACE(REPLACE(REPLACE(:Business_Unit, '(', ''), ')', ''), '''', '');
+Business_Segment            := REPLACE(REPLACE(REPLACE(:Business_Segment, '(', ''), ')', ''), '''', '');
+Sales_Region                := REPLACE(REPLACE(REPLACE(:Sales_Region, '(', ''), ')', ''), '''', '');
+Sales_Territory             := REPLACE(REPLACE(REPLACE(:Sales_Territory, '(', ''), ')', ''), '''', '');
+Country_key                 := REPLACE(REPLACE(REPLACE(:Country_key, '(', ''), ')', ''), '''', '');
+PVM_Product_Group           := REPLACE(REPLACE(REPLACE(:PVM_Product_Group, '(', ''), ')', ''), '''', '');
+PVM_Customer_Channel_Group  := REPLACE(REPLACE(REPLACE(:PVM_Customer_Channel_Group, '(', ''), ')', ''), '''', '');
+CSB_ES_Markets              := REPLACE(REPLACE(REPLACE(:CSB_ES_Markets, '(', ''), ')', ''), '''', '');
+CSB_ES_Sub_Markets          := REPLACE(REPLACE(REPLACE(:CSB_ES_Sub_Markets, '(', ''), ')', ''), '''', '');
+IC_Business_Segment         := REPLACE(REPLACE(REPLACE(:IC_Business_Segment, '(', ''), ')', ''), '''', '');
+Global_Customer_Group       := REPLACE(REPLACE(REPLACE(:Global_Customer_Group, '(', ''), ')', ''), '''', '');
+Prod_Hier_1                 := REPLACE(REPLACE(REPLACE(:Prod_Hier_1, '(', ''), ')', ''), '''', '');
+Prod_Hier_2                 := REPLACE(REPLACE(REPLACE(:Prod_Hier_2,  '(', ''), ')', ''), '''', '');
+Prod_Hier_3                 := REPLACE(REPLACE(REPLACE(:Prod_Hier_3, '(', ''), ')', ''), '''', '');
+
+RUNID = YEAR (CURRENT_DATE)         * 10000000000
+       + MONTH(CURRENT_DATE)        * 100000000
+       + DAYOFMONTH (CURRENT_DATE)  * 1000000
+       + HOUR (CURRENT_TIME)        * 10000
+       + MINUTE (CURRENT_TIME)      * 100
+       + SECOND (CURRENT_TIME);
+
+
+
+/***********************************************
+   * SP1_AP
+***********************************************/
+v_SP1_AP = SELECT
+	   "PVM_Product_Group",
+	   "PVM_Customer_Channel_Group",
+	   "Prod_Hier_1",
+	   "Prod_Hier_2",
+	   "Prod_Hier_3",
+	   "Global_Customer_Group",
+	   "CSB_ES_Markets",
+	   "CSB_ES_Sub_Markets",
+	   "Business_Group",
+	   "Business_Unit",
+	   "Business_Segment",
+	   "IC_Business_Segment",
+	   "Sales_Region",
+	   "Sales_Territory",
+	   "Country_key",
+	   "Target_Quantity_UoM",
+	   "Local_Currency",
+	   "Document_currency",
+	   "AP_Reporting_Qty",
+	   "AP_Gross_Sales_USD",
+	   "AP_Net_Sales_USD",
+	   "AP_Cust_Frt_USD",
+	   "AP_Dir_Cost_USD",
+	   "AP_Per_Cost_USD",
+	   "AP_Material_Costs_USD",
+	   "AP_Other_Direct_Costs_USD",
+	   "AP_Other_Cost_of_Sales_USD",
+	   "AP_Gross_Margin_USD",
+	   "AP_Contribution_Margin_USD",
+	   "AP_Gross_Sales_Loc",
+	   "AP_Net_Sales_Loc",
+	   "AP_Cust_Frt_Loc",
+	   "AP_Dir_Cost_Loc",
+	   "AP_Per_Cost_Loc",
+	   "AP_Material_Costs_Loc",
+	   "AP_Other_Direct_Costs_Loc",
+	   "AP_Other_Cost_of_Sales_Loc",
+	   "AP_Gross_Margin_Loc",
+	   "AP_Contribution_Margin_Loc",
+	   "AP_Gross_Sales_Doc",
+	   "AP_Net_Sales_Doc",
+	   "AP_Cust_Frt_Doc",
+	   "AP_Dir_Cost_Doc",
+	   "AP_Per_Cost_Doc",
+	   "AP_Material_Costs_Doc",
+	   "AP_Other_Direct_Costs_Doc",
+	   "AP_Other_Cost_of_Sales_Doc",
+	   "AP_Gross_Margin_Doc",
+	   "AP_Contribution_Margin_Doc"
+FROM "PVM"."fn_AnalysisPeriodData" (:Calendar_Year_Month_AP,
+                                  	 :Business_Group,
+                                  	 :Business_Unit,
+                                  	 :Business_Segment,
+                                  	 :Sales_Region,
+                                  	 :Sales_Territory,
+                                  	 :Country_key,
+                                  	 :PVM_Product_Group,
+                                  	 :PVM_Customer_Channel_Group,
+                                  	 :CSB_ES_Markets,
+                                  	 :CSB_ES_Sub_Markets,
+                                  	 :IC_Business_Segment,
+                                  	 :Global_Customer_Group,
+                                   	 :Prod_Hier_1,
+                                  	 :Prod_Hier_2,
+                                  	 :Prod_Hier_3,
+                                  	 :GSAPID_Clean);
+
+
+/************************************************
+   * SP2_BP
+************************************************/
+v_SP2_BP = SELECT
+        "PVM_Product_Group",
+        "PVM_Customer_Channel_Group",
+        "Prod_Hier_1",
+        "Prod_Hier_2",
+        "Prod_Hier_3",
+        "Global_Customer_Group",
+        "CSB_ES_Markets",
+        "CSB_ES_Sub_Markets",
+        "Business_Group",
+        "Business_Unit",
+        "Business_Segment",
+		"IC_Business_Segment",
+        "Sales_Region",
+        "Sales_Territory",
+        "Country_key",
+        "Target_Quantity_UoM",
+        "Local_Currency",
+        "Document_currency",
+        "BP_Reporting_Qty",
+        "BP_Gross_Sales_USD",
+        "BP_Net_Sales_USD",
+        "BP_Cust_Frt_USD",
+        "BP_Dir_Cost_USD",
+        "BP_Per_Cost_USD",
+        "BP_Material_Costs_USD",
+        "BP_Other_Direct_Costs_USD",
+        "BP_Other_Cost_of_Sales_USD",
+        "BP_Gross_Margin_USD",
+        "BP_Contribution_Margin_USD",
+        "BP_Gross_Sales_Loc",
+        "BP_Net_Sales_Loc",
+        "BP_Cust_Frt_Loc",
+        "BP_Dir_Cost_Loc",
+        "BP_Per_Cost_Loc",
+        "BP_Material_Costs_Loc",
+        "BP_Other_Direct_Costs_Loc",
+        "BP_Other_Cost_of_Sales_Loc",
+        "BP_Gross_Margin_Loc",
+        "BP_Contribution_Margin_Loc",
+        "BP_Gross_Sales_Doc",
+        "BP_Net_Sales_Doc",
+        "BP_Cust_Frt_Doc",
+        "BP_Dir_Cost_Doc",
+        "BP_Per_Cost_Doc",
+        "BP_Material_Costs_Doc",
+        "BP_Other_Direct_Costs_Doc",
+        "BP_Other_Cost_of_Sales_Doc",
+        "BP_Gross_Margin_Doc",
+        "BP_Contribution_Margin_Doc"
+   FROM "PVM"."fn_BasePeriodData" ( :Calendar_Year_Month_BP,
+                                    :Business_Group,
+                                    :Business_Unit,
+                                    :Business_Segment,
+                                    :Sales_Region,
+                                    :Sales_Territory,
+                                    :Country_key,
+                                    :PVM_Product_Group,
+                                    :PVM_Customer_Channel_Group,
+                                    :CSB_ES_Markets,
+                                    :CSB_ES_Sub_Markets,
+                                    :IC_Business_Segment,
+                                    :Global_Customer_Group,
+                                    :Prod_Hier_1,
+                                    :Prod_Hier_2,
+                                    :Prod_Hier_3,
+                                    :GSAPID_Clean );
+
+/************************************************
+   * SP3_OA (and apply to SP5_AP_BP_OA_PA)
+************************************************/
+v_SP3_OA = SELECT
+      "Business_Segment",
+      "Target_Quantity_UoM"             AS "Unit_of_Measure",
+      "Local_Currency",
+      "Document_currency",
+      SUM("BP_Reporting_Qty")           AS "BP_Reporting_Qty",
+      SUM("BP_Net_Sales_USD")           AS "Net_Sales_USD",
+      SUM("BP_Gross_Margin_USD")        AS "Gross_Margin_USD",
+      SUM("BP_Contribution_Margin_USD") AS "Contribution_Margin_USD",
+      SUM("BP_Net_Sales_Loc")           AS "Net_Sales_Loc",
+      SUM("BP_Gross_Margin_Loc")        AS "Gross_Margin_Loc",
+      SUM("BP_Contribution_Margin_Loc") AS "Contribution_Margin_Loc",
+      SUM("BP_Net_Sales_Doc")           AS "Net_Sales_Doc",
+      SUM("BP_Gross_Margin_Doc")        AS "Gross_Margin_Doc",
+      SUM("BP_Contribution_Margin_Doc") AS "Contribution_Margin_Doc"
+FROM  :v_SP2_BP
+WHERE "PVM_Product_Group" <> 'Other'
+GROUP BY
+      "Business_Segment",
+      "Target_Quantity_UoM",
+      "Local_Currency",
+      "Document_currency";
+
+
+/************************************************
+   * SP4_PA (and apply to SP5_AP_BP_OA_PA)
+************************************************/
+v_SP4_PA = SELECT
+          "PVM_Product_Group"               AS "Product_Group",
+          "Business_Segment",
+          "Target_Quantity_UoM"             AS "Unit_of_Measure",
+          "Local_Currency",
+          "Document_currency",
+          SUM("BP_Reporting_Qty")           AS "BP_Reporting_Qty",
+          SUM("BP_Net_Sales_USD")           AS "Net_Sales_USD",
+          SUM("BP_Gross_Margin_USD")        AS "Gross_Margin_USD",
+          SUM("BP_Contribution_Margin_USD") AS "Contribution_Margin_USD",
+          SUM("BP_Net_Sales_Loc")           AS "Net_Sales_Loc",
+          SUM("BP_Gross_Margin_Loc")        AS "Gross_Margin_Loc",
+          SUM("BP_Contribution_Margin_Loc") AS "Contribution_Margin_Loc",
+          SUM("BP_Net_Sales_Doc")           AS "Net_Sales_Doc",
+          SUM("BP_Gross_Margin_Doc")        AS "Gross_Margin_Doc",
+          SUM("BP_Contribution_Margin_Doc") AS "Contribution_Margin_Doc"
+    FROM  :v_SP2_BP
+    WHERE "PVM_Product_Group" <> 'Other'
+    GROUP BY
+          "PVM_Product_Group",
+          "Business_Segment",
+          "Target_Quantity_UoM",
+          "Local_Currency",
+          "Document_currency"
+    HAVING SUM("BP_Reporting_Qty") <> 0;
+
+
+/**********************************************
+   * SP8_CI_Loc (and apply to SP5_AP_BP_OA_PA)
+**********************************************/
+v_SP8_CI_Loc =
+    SELECT "Local_Currency", "Document_currency",
+            CASE WHEN SUM("BP_Net_Sales_Doc") = 0 THEN 0
+            ELSE SUM("BP_Net_Sales_Loc") / SUM("BP_Net_Sales_Doc")
+            END AS "Overall_Loc_Doc_exchange_Rate"
+    FROM  :v_SP2_BP
+    GROUP BY "Local_Currency", "Document_currency";
+
+
+/************************************************
+   * SP9_CI_USD (and apply to SP5_AP_BP_OA_PA)
+************************************************/
+v_SP9_CI_USD =
+    SELECT "Document_currency",
+            CASE WHEN SUM("BP_Net_Sales_Doc") = 0 THEN 0
+            ELSE SUM("BP_Net_Sales_USD") / SUM("BP_Net_Sales_Doc")
+            END AS "Overall_USD_Doc_exchange_Rate"
+    FROM  :v_SP2_BP
+    GROUP BY "Document_currency";
+
+/************************************************
+  * Partial SP5_AP_BP_OA_PA
+ ***********************************************/
+-- Define a Common Table Expression (CTE). Must be immediately consumed by a query or DML.
+v_CTE = SELECT
+    COALESCE(AP."PVM_Product_Group", BP."PVM_Product_Group") 				   AS "Product_Group",
+    COALESCE(AP."PVM_Customer_Channel_Group", BP."PVM_Customer_Channel_Group") AS "Channel_Group",
+    COALESCE(AP."Prod_Hier_1", BP."Prod_Hier_1") AS "PH1",
+    COALESCE(AP."Prod_Hier_2", BP."Prod_Hier_2") AS "PH2",
+    COALESCE(AP."Prod_Hier_3", BP."Prod_Hier_3") AS "PH3",
+    COALESCE(AP."Global_Customer_Group", BP."Global_Customer_Group") AS "Global_Customer_Group",
+    COALESCE(AP."CSB_ES_Markets", BP."CSB_ES_Markets")           	 AS "ES_Market",
+    COALESCE(AP."CSB_ES_Sub_Markets", BP."CSB_ES_Sub_Markets")  	 AS "ES_sub_Market",
+    COALESCE(AP."Business_Group", BP."Business_Group")          	 AS "Business_Group",
+    COALESCE(AP."Business_Unit",  BP."Business_Unit")           	 AS "Business_Unit",
+    COALESCE(AP."Business_Segment", BP."Business_Segment")      	 AS "Business_Segment",
+    COALESCE(AP."IC_Business_Segment", BP."IC_Business_Segment")	 AS "IC_Business_Segment",
+    COALESCE(AP."Sales_Region", BP."Sales_Region")              	 AS "Sales_Region",
+    COALESCE(AP."Sales_Territory", BP."Sales_Territory")        	 AS "Sales_Territory",
+    COALESCE(AP."Country_key", BP."Country_key")                	 AS "Country",
+    COALESCE(AP."Target_Quantity_UoM", BP."Target_Quantity_UoM")	 AS "Unit_of_Measure",
+    COALESCE(AP."Local_Currency", BP."Local_Currency")          	 AS "Local_Currency",
+    COALESCE(AP."Document_currency", BP."Document_currency")    	 AS "Document_currency",
+    IFNULL(AP."AP_Reporting_Qty", 0)          						 AS "AP_Reporting_Qty",
+    IFNULL(AP."AP_Gross_Sales_USD", 0)        						 AS "AP_Gross_Sales_USD",
+    IFNULL(AP."AP_Net_Sales_USD", 0)          						 AS "AP_Net_Sales_USD",
+    IFNULL(AP."AP_Cust_Frt_USD", 0)           						 AS "AP_Cust_Frt_USD",
+    IFNULL(AP."AP_Dir_Cost_USD", 0)         						 AS "AP_Dir_Cost_USD",
+    IFNULL(AP."AP_Per_Cost_USD", 0)           						 AS "AP_Per_Cost_USD",
+    IFNULL(AP."AP_Material_Costs_USD", 0)     						 AS "AP_Material_Costs_USD",
+    IFNULL(AP."AP_Other_Direct_Costs_USD", 0) 						 AS "AP_Other_Direct_Costs_USD",
+    IFNULL(AP."AP_Other_Cost_of_Sales_USD", 0)						 AS "AP_Other_Cost_of_Sales_USD",
+    IFNULL(AP."AP_Gross_Margin_USD", 0)       						 AS "AP_Gross_Margin_USD",
+    IFNULL(AP."AP_Contribution_Margin_USD", 0)						 AS "AP_Contribution_Margin_USD",
+    IFNULL(AP."AP_Gross_Sales_Loc", 0)        						 AS "AP_Gross_Sales_Loc",
+    IFNULL(AP."AP_Net_Sales_Loc", 0)          						 AS "AP_Net_Sales_Loc",
+    IFNULL(AP."AP_Cust_Frt_Loc", 0)           						 AS "AP_Cust_Frt_Loc",
+    IFNULL(AP."AP_Dir_Cost_Loc", 0)           						 AS "AP_Dir_Cost_Loc",
+    IFNULL(AP."AP_Per_Cost_Loc", 0)           						 AS "AP_Per_Cost_Loc",
+    IFNULL(AP."AP_Material_Costs_Loc", 0)     						 AS "AP_Material_Costs_Loc",
+    IFNULL(AP."AP_Other_Direct_Costs_Loc", 0) 						 AS "AP_Other_Direct_Costs_Loc",
+    IFNULL(AP."AP_Other_Cost_of_Sales_Loc", 0)						 AS "AP_Other_Cost_of_Sales_Loc",
+    IFNULL(AP."AP_Gross_Margin_Loc", 0)       						 AS "AP_Gross_Margin_Loc",
+    IFNULL(AP."AP_Contribution_Margin_Loc", 0)						 AS "AP_Contribution_Margin_Loc",
+    IFNULL(AP."AP_Gross_Sales_Doc", 0)         						 AS "AP_Gross_Sales_Doc",
+    IFNULL(AP."AP_Net_Sales_Doc", 0)          						 AS "AP_Net_Sales_Doc",
+    IFNULL(AP."AP_Cust_Frt_Doc", 0)           						 AS "AP_Cust_Frt_Doc",
+    IFNULL(AP."AP_Dir_Cost_Doc", 0)           						 AS "AP_Dir_Cost_Doc",
+    IFNULL(AP."AP_Per_Cost_Doc", 0)           						 AS "AP_Per_Cost_Doc",
+    IFNULL(AP."AP_Material_Costs_Doc", 0)    						 AS "AP_Material_Costs_Doc",
+    IFNULL(AP."AP_Other_Direct_Costs_Doc", 0) 						 AS "AP_Other_Direct_Costs_Doc",
+    IFNULL(AP."AP_Other_Cost_of_Sales_Doc", 0)						 AS "AP_Other_Cost_of_Sales_Doc",
+    IFNULL(AP."AP_Gross_Margin_Doc", 0)       						 AS "AP_Gross_Margin_Doc",
+    IFNULL(AP."AP_Contribution_Margin_Doc", 0)						 AS "AP_Contribution_Margin_Doc",
+    IFNULL(BP."BP_Reporting_Qty", 0)           AS "BP_Reporting_Qty",
+    IFNULL(BP."BP_Gross_Sales_USD", 0)         AS "BP_Gross_Sales_USD",
+    IFNULL(BP."BP_Net_Sales_USD", 0)           AS "BP_Net_Sales_USD",
+    IFNULL(BP."BP_Cust_Frt_USD", 0)            AS "BP_Cust_Frt_USD",
+    IFNULL(BP."BP_Dir_Cost_USD", 0)            AS "BP_Dir_Cost_USD",
+    IFNULL(BP."BP_Per_Cost_USD", 0)            AS "BP_Per_Cost_USD",
+    IFNULL(BP."BP_Material_Costs_USD", 0)      AS "BP_Material_Costs_USD",
+    IFNULL(BP."BP_Other_Direct_Costs_USD", 0)  AS "BP_Other_Direct_Costs_USD",
+    IFNULL(BP."BP_Other_Cost_of_Sales_USD", 0) AS "BP_Other_Cost_of_Sales_USD",
+    IFNULL(BP."BP_Gross_Margin_USD", 0)        AS "BP_Gross_Margin_USD",
+    IFNULL(BP."BP_Contribution_Margin_USD", 0) AS "BP_Contribution_Margin_USD",
+    IFNULL(BP."BP_Gross_Sales_Loc", 0)         AS "BP_Gross_Sales_Loc",
+    IFNULL(BP."BP_Net_Sales_Loc", 0)           AS "BP_Net_Sales_Loc",
+    IFNULL(BP."BP_Cust_Frt_Loc", 0)            AS "BP_Cust_Frt_Loc",
+    IFNULL(BP."BP_Dir_Cost_Loc", 0)            AS "BP_Dir_Cost_Loc",
+    IFNULL(BP."BP_Per_Cost_Loc", 0)            AS "BP_Per_Cost_Loc",
+    IFNULL(BP."BP_Material_Costs_Loc", 0)      AS "BP_Material_Costs_Loc",
+    IFNULL(BP."BP_Other_Direct_Costs_Loc", 0)  AS "BP_Other_Direct_Costs_Loc",
+    IFNULL(BP."BP_Other_Cost_of_Sales_Loc", 0) AS "BP_Other_Cost_of_Sales_Loc",
+    IFNULL(BP."BP_Gross_Margin_Loc", 0)        AS "BP_Gross_Margin_Loc",
+    IFNULL(BP."BP_Contribution_Margin_Loc", 0) AS "BP_Contribution_Margin_Loc",
+    IFNULL(BP."BP_Gross_Sales_Doc", 0)         AS "BP_Gross_Sales_Doc",
+    IFNULL(BP."BP_Net_Sales_Doc", 0)           AS "BP_Net_Sales_Doc",
+    IFNULL(BP."BP_Cust_Frt_Doc", 0)            AS "BP_Cust_Frt_Doc",
+    IFNULL(BP."BP_Dir_Cost_Doc", 0)            AS "BP_Dir_Cost_Doc",
+    IFNULL(BP."BP_Per_Cost_Doc", 0)            AS "BP_Per_Cost_Doc",
+    IFNULL(BP."BP_Material_Costs_Doc", 0)      AS "BP_Material_Costs_Doc",
+    IFNULL(BP."BP_Other_Direct_Costs_Doc", 0)  AS "BP_Other_Direct_Costs_Doc",
+    IFNULL(BP."BP_Other_Cost_of_Sales_Doc", 0) AS "BP_Other_Cost_of_Sales_Doc",
+    IFNULL(BP."BP_Gross_Margin_Doc", 0)        AS "BP_Gross_Margin_Doc",
+    IFNULL(BP."BP_Contribution_Margin_Doc", 0) AS "BP_Contribution_Margin_Doc",
+/*
+    CAST(0 AS float) AS "Net_Sales_USD_OA",
+    CAST(0 AS float) AS "Gross_Margin_USD_OA",
+    CAST(0 AS float) AS "Contribution_Margin_USD_OA",
+    CAST(0 AS float) AS "Net_Sales_Loc_OA",
+    CAST(0 AS float) AS "Gross_Margin_Loc_OA",
+    CAST(0 AS float) AS "Contribution_Margin_Loc_OA",
+    CAST(0 AS float) AS "Net_Sales_Doc_OA",
+    CAST(0 AS float) AS "Gross_Margin_Doc_OA",
+    CAST(0 AS float) AS "Contribution_Margin_Doc_OA",
+    CAST(0 AS float) AS "Net_Sales_USD_PA",
+    CAST(0 AS float) AS "Gross_Margin_USD_PA",
+    CAST(0 AS float) AS "Contribution_Margin_USD_PA",
+    CAST(0 AS float) AS "Net_Sales_Loc_PA",
+    CAST(0 AS float) AS "Gross_Margin_Loc_PA",
+    CAST(0 AS float) AS "Contribution_Margin_Loc_PA",
+    CAST(0 AS float) AS "Net_Sales_Doc_PA",
+    CAST(0 AS float) AS "Gross_Margin_Doc_PA",
+    CAST(0 AS float) AS "Contribution_Margin_Doc_PA",
+    CAST(0 AS float) AS "Overall_Loc_Doc_exchange_Rate",
+    CAST(0 AS float) AS "Overall_USD_Doc_exchange_Rate",
+*/
+    CASE WHEN IFNULL(BP."BP_Net_Sales_Doc", 0) = 0 THEN 0
+    	 ELSE (BP."BP_Net_Sales_Loc" / BP."BP_Net_Sales_Doc")
+    END  AS "Loc_Doc_exchange_Rate",
+    CASE WHEN IFNULL(BP."BP_Net_Sales_Doc", 0) = 0 THEN 0
+    	 ELSE (BP."BP_Net_Sales_USD" / BP."BP_Net_Sales_Doc")
+    END  AS "USD_Doc_exchange_Rate"
+FROM :v_SP1_AP AP
+FULL OUTER JOIN :v_SP2_BP BP
+     ON AP."PVM_Product_Group"          = BP."PVM_Product_Group"
+    AND AP."PVM_Customer_Channel_Group" = BP."PVM_Customer_Channel_Group"
+    AND AP."Prod_Hier_1"                = BP."Prod_Hier_1"
+    AND AP."Prod_Hier_2"                = BP."Prod_Hier_2"
+    AND AP."Prod_Hier_3"                = BP."Prod_Hier_3"
+    AND AP."Global_Customer_Group"      = BP."Global_Customer_Group"
+    AND AP."CSB_ES_Markets"             = BP."CSB_ES_Markets"
+    AND AP."CSB_ES_Sub_Markets"         = BP."CSB_ES_Sub_Markets"
+    AND AP."Business_Group"             = BP."Business_Group"
+    AND AP."Business_Unit"              = BP."Business_Unit"
+    AND AP."Business_Segment"           = BP."Business_Segment"
+    AND AP."IC_Business_Segment" 	= BP."IC_Business_Segment"
+    AND AP."Sales_Region"               = BP."Sales_Region"
+    AND AP."Sales_Territory"            = BP."Sales_Territory"
+    AND AP."Country_key"                = BP."Country_key"
+    AND AP."Target_Quantity_UoM"        = BP."Target_Quantity_UoM"
+    AND AP."Local_Currency"             = BP."Local_Currency"
+    AND AP."Document_currency"          = BP."Document_currency";
+
+
+-- Select from from SP8, SP9 into SP5
+v_SP5_OA = SELECT SP5.*,
+    IFNULL(SP8."Overall_Loc_Doc_exchange_Rate", 0) as "Overall_Loc_Doc_exchange_Rate",
+    IFNULL(SP9."Overall_USD_Doc_exchange_Rate", 0) as "Overall_USD_Doc_exchange_Rate"
+FROM :v_CTE SP5
+LEFT OUTER JOIN :v_SP8_CI_Loc SP8
+        ON SP5."Local_Currency"    = SP8."Local_Currency" AND
+           SP5."Document_currency" = SP8."Document_currency"
+LEFT OUTER JOIN :v_SP9_CI_USD SP9
+        ON SP5."Document_currency" = SP9."Document_currency";
+
+-- Select from SP3 & SP4 into SP5
+v_SP5 = SELECT SP5.*,
+-- SP3_OA
+    IFNULL(SP3_OA_BS_UOM."Net_Sales_USD_OA", 0)              AS "Net_Sales_USD_OA",
+    IFNULL(SP3_OA_BS_UOM."Gross_Margin_USD_OA", 0)           AS "Gross_Margin_USD_OA",
+    IFNULL(SP3_OA_BS_UOM."Contribution_Margin_USD_OA", 0)    AS "Contribution_Margin_USD_OA",
+    IFNULL(SP3_OA_BS_UOM_LC."Net_Sales_Loc_OA", 0)           AS "Net_Sales_Loc_OA",
+    IFNULL(SP3_OA_BS_UOM_LC."Gross_Margin_Loc_OA", 0)        AS "Gross_Margin_Loc_OA",
+    IFNULL(SP3_OA_BS_UOM_LC."Contribution_Margin_Loc_OA", 0) AS "Contribution_Margin_Loc_OA",
+    IFNULL(SP3_OA_BS_UOM_DC."Net_Sales_Doc_OA", 0)           AS "Net_Sales_Doc_OA"           ,
+    IFNULL(SP3_OA_BS_UOM_DC."Gross_Margin_Doc_OA", 0)        AS "Gross_Margin_Doc_OA",
+    IFNULL(SP3_OA_BS_UOM_DC."Contribution_Margin_Doc_OA", 0) AS "Contribution_Margin_Doc_OA",
+-- SP4_PA
+    IFNULL(SP4_PA_PG_UOM."Net_Sales_USD_PA", 0)              AS "Net_Sales_USD_PA",
+    IFNULL(SP4_PA_PG_UOM."Gross_Margin_USD_PA", 0)           AS "Gross_Margin_USD_PA",
+    IFNULL(SP4_PA_PG_UOM."Contribution_Margin_USD_PA", 0)    AS "Contribution_Margin_USD_PA",
+    IFNULL(SP4_PA_PG_UOM_LC."Net_Sales_Loc_PA", 0)           AS "Net_Sales_Loc_PA",
+    IFNULL(SP4_PA_PG_UOM_LC."Gross_Margin_Loc_PA", 0)        AS "Gross_Margin_Loc_PA",
+    IFNULL(SP4_PA_PG_UOM_LC."Contribution_Margin_Loc_PA", 0) AS "Contribution_Margin_Loc_PA",
+    IFNULL(SP4_PA_PG_UOM_DC."Net_Sales_Doc_PA", 0)           AS "Net_Sales_Doc_PA",
+    IFNULL(SP4_PA_PG_UOM_DC."Gross_Margin_Doc_PA", 0)        AS "Gross_Margin_Doc_PA",
+    IFNULL(SP4_PA_PG_UOM_DC."Contribution_Margin_Doc_PA", 0) AS "Contribution_Margin_Doc_PA"
+FROM :v_SP5_OA SP5
+-- Select from SP3 into SP5
+    LEFT OUTER JOIN
+        (SELECT "Business_Segment",
+                "Unit_of_Measure",
+                (SUM("Net_Sales_USD")           / SUM("BP_Reporting_Qty")) AS "Net_Sales_USD_OA",
+                (SUM("Gross_Margin_USD")        / SUM("BP_Reporting_Qty")) AS "Gross_Margin_USD_OA",
+                (SUM("Contribution_Margin_USD") / SUM("BP_Reporting_Qty")) AS "Contribution_Margin_USD_OA"
+         FROM  :v_SP3_OA
+         GROUP BY
+               "Business_Segment",
+               "Unit_of_Measure"
+         HAVING SUM("BP_Reporting_Qty") <> 0)
+         AS SP3_OA_BS_UOM
+	     ON SP5."Business_Segment" = SP3_OA_BS_UOM."Business_Segment" AND
+	        SP5."Unit_of_Measure"  = SP3_OA_BS_UOM."Unit_of_Measure"
+    LEFT OUTER JOIN
+        (SELECT "Business_Segment",
+                "Unit_of_Measure",
+                "Local_Currency",
+                (SUM("Net_Sales_Loc")           / SUM("BP_Reporting_Qty")) AS "Net_Sales_Loc_OA",
+                (SUM("Gross_Margin_Loc")        / SUM("BP_Reporting_Qty")) AS "Gross_Margin_Loc_OA",
+                (SUM("Contribution_Margin_Loc") / SUM("BP_Reporting_Qty")) AS "Contribution_Margin_Loc_OA"
+        FROM  :v_SP3_OA
+        GROUP BY "Business_Segment",
+                 "Unit_of_Measure",
+                 "Local_Currency"
+        HAVING SUM("BP_Reporting_Qty") <> 0)
+        AS SP3_OA_BS_UOM_LC
+	    ON SP5."Business_Segment" = SP3_OA_BS_UOM_LC."Business_Segment" AND
+	       SP5."Unit_of_Measure"  = SP3_OA_BS_UOM_LC."Unit_of_Measure"  AND
+	       SP5."Local_Currency"   = SP3_OA_BS_UOM_LC."Local_Currency"
+    LEFT OUTER JOIN
+        (SELECT "Business_Segment", "Unit_of_Measure", "Document_currency",
+                (SUM("Net_Sales_Doc")           / SUM("BP_Reporting_Qty")) AS "Net_Sales_Doc_OA",
+                (SUM("Gross_Margin_Doc")        / SUM("BP_Reporting_Qty")) AS "Gross_Margin_Doc_OA",
+                (SUM("Contribution_Margin_Doc") / SUM("BP_Reporting_Qty")) AS "Contribution_Margin_Doc_OA"
+        FROM :v_SP3_OA
+        GROUP BY "Business_Segment",
+                 "Unit_of_Measure",
+                 "Document_currency"
+        HAVING SUM("BP_Reporting_Qty") <> 0)
+        AS SP3_OA_BS_UOM_DC
+	    ON SP5."Business_Segment"  = SP3_OA_BS_UOM_DC."Business_Segment" AND
+	       SP5."Unit_of_Measure"   = SP3_OA_BS_UOM_DC."Unit_of_Measure"  AND
+	       SP5."Document_currency" = SP3_OA_BS_UOM_DC."Document_currency"
+-- Select from SP4 into SP5
+    LEFT OUTER JOIN (
+        SELECT  "Product_Group",
+                "Business_Segment",
+                "Unit_of_Measure",
+                (SUM("Net_Sales_USD")           / SUM("BP_Reporting_Qty")) AS "Net_Sales_USD_PA",
+                (SUM("Gross_Margin_USD")        / SUM("BP_Reporting_Qty")) AS "Gross_Margin_USD_PA",
+                (SUM("Contribution_Margin_USD") / SUM("BP_Reporting_Qty")) AS "Contribution_Margin_USD_PA"
+        FROM :v_SP4_PA
+        GROUP BY "Product_Group",
+                 "Business_Segment",
+                 "Unit_of_Measure"
+        HAVING SUM("BP_Reporting_Qty") <> 0)
+        AS SP4_PA_PG_UOM
+        ON SP5."Product_Group"    = SP4_PA_PG_UOM."Product_Group"    AND
+           SP5."Business_Segment" = SP4_PA_PG_UOM."Business_Segment" AND
+           SP5."Unit_of_Measure"  = SP4_PA_PG_UOM."Unit_of_Measure"
+    LEFT OUTER JOIN (
+        SELECT  "Product_Group", "Business_Segment", "Unit_of_Measure", "Local_Currency",
+                (SUM("Net_Sales_Loc")           / SUM("BP_Reporting_Qty")) AS "Net_Sales_Loc_PA",
+                (SUM("Gross_Margin_Loc")        / SUM("BP_Reporting_Qty")) AS "Gross_Margin_Loc_PA",
+                (SUM("Contribution_Margin_Loc") / SUM("BP_Reporting_Qty")) AS "Contribution_Margin_Loc_PA"
+        FROM :v_SP4_PA
+        GROUP BY "Product_Group",
+                 "Business_Segment",
+                 "Unit_of_Measure",
+                 "Local_Currency"
+        HAVING SUM("BP_Reporting_Qty") <> 0)
+        AS SP4_PA_PG_UOM_LC
+        ON SP5."Product_Group"    = SP4_PA_PG_UOM_LC."Product_Group"    AND
+           SP5."Business_Segment" = SP4_PA_PG_UOM_LC."Business_Segment" AND
+           SP5."Unit_of_Measure"  = SP4_PA_PG_UOM_LC."Unit_of_Measure"  AND
+           SP5."Local_Currency"   = SP4_PA_PG_UOM_LC."Local_Currency"
+    LEFT OUTER JOIN (
+        SELECT  "Product_Group", "Business_Segment", "Unit_of_Measure", "Document_currency",
+                (SUM("Net_Sales_Doc")           / SUM("BP_Reporting_Qty")) AS "Net_Sales_Doc_PA",
+                (SUM("Gross_Margin_Doc")        / SUM("BP_Reporting_Qty")) AS "Gross_Margin_Doc_PA",
+                (SUM("Contribution_Margin_Doc") / SUM("BP_Reporting_Qty")) AS "Contribution_Margin_Doc_PA"
+        FROM :v_SP4_PA
+        GROUP BY "Product_Group",
+                 "Business_Segment",
+                 "Unit_of_Measure",
+                 "Document_currency"
+        HAVING SUM("BP_Reporting_Qty") <> 0)
+        AS  SP4_PA_PG_UOM_DC
+        ON  SP5."Product_Group"     = SP4_PA_PG_UOM_DC."Product_Group"    AND
+            SP5."Business_Segment"  = SP4_PA_PG_UOM_DC."Business_Segment" AND
+            SP5."Unit_of_Measure"   = SP4_PA_PG_UOM_DC."Unit_of_Measure"  AND
+            SP5."Document_currency" = SP4_PA_PG_UOM_DC."Document_currency";
+            
+/************************************************
+   * SP5_AP_BP_OA_PA
+************************************************/
+-- This is to adjust the sequence of fields
+v_SP5_AP_BP_OA_PA = SELECT
+    "Product_Group",
+    "Channel_Group",
+    "PH1",
+    "PH2",
+    "PH3",
+    "Global_Customer_Group",
+    "ES_Market",
+    "ES_sub_Market",
+    "Business_Group",
+    "Business_Unit",
+    "Business_Segment",
+    "IC_Business_Segment",
+    "Sales_Region",
+    "Sales_Territory",
+    "Country",
+    "Unit_of_Measure",
+    "Local_Currency",
+    "Document_currency",
+    "AP_Reporting_Qty",
+    "AP_Gross_Sales_USD",
+    "AP_Net_Sales_USD",
+    "AP_Cust_Frt_USD",
+    "AP_Dir_Cost_USD",
+    "AP_Per_Cost_USD",
+    "AP_Material_Costs_USD",
+    "AP_Other_Direct_Costs_USD",
+    "AP_Other_Cost_of_Sales_USD",
+    "AP_Gross_Margin_USD",
+    "AP_Contribution_Margin_USD",
+    "AP_Gross_Sales_Loc",
+    "AP_Net_Sales_Loc",
+    "AP_Cust_Frt_Loc",
+    "AP_Dir_Cost_Loc",
+    "AP_Per_Cost_Loc",
+    "AP_Material_Costs_Loc",
+    "AP_Other_Direct_Costs_Loc",
+    "AP_Other_Cost_of_Sales_Loc",
+    "AP_Gross_Margin_Loc",
+    "AP_Contribution_Margin_Loc",
+    "AP_Gross_Sales_Doc",
+    "AP_Net_Sales_Doc",
+    "AP_Cust_Frt_Doc",
+    "AP_Dir_Cost_Doc",
+    "AP_Per_Cost_Doc",
+    "AP_Material_Costs_Doc",
+    "AP_Other_Direct_Costs_Doc",
+    "AP_Other_Cost_of_Sales_Doc",
+    "AP_Gross_Margin_Doc",
+    "AP_Contribution_Margin_Doc",
+    "BP_Reporting_Qty",
+    "BP_Gross_Sales_USD",
+    "BP_Net_Sales_USD",
+    "BP_Cust_Frt_USD",
+    "BP_Dir_Cost_USD",
+    "BP_Per_Cost_USD",
+    "BP_Material_Costs_USD",
+    "BP_Other_Direct_Costs_USD",
+    "BP_Other_Cost_of_Sales_USD",
+    "BP_Gross_Margin_USD",
+    "BP_Contribution_Margin_USD",
+    "BP_Gross_Sales_Loc",
+    "BP_Net_Sales_Loc",
+    "BP_Cust_Frt_Loc",
+    "BP_Dir_Cost_Loc",
+    "BP_Per_Cost_Loc",
+    "BP_Material_Costs_Loc",
+    "BP_Other_Direct_Costs_Loc",
+    "BP_Other_Cost_of_Sales_Loc",
+    "BP_Gross_Margin_Loc",
+    "BP_Contribution_Margin_Loc",
+    "BP_Gross_Sales_Doc",
+    "BP_Net_Sales_Doc",
+    "BP_Cust_Frt_Doc",
+    "BP_Dir_Cost_Doc",
+    "BP_Per_Cost_Doc",
+    "BP_Material_Costs_Doc",
+    "BP_Other_Direct_Costs_Doc",
+    "BP_Other_Cost_of_Sales_Doc",
+    "BP_Gross_Margin_Doc",
+    "BP_Contribution_Margin_Doc",
+    "Net_Sales_USD_OA",
+    "Gross_Margin_USD_OA",
+    "Contribution_Margin_USD_OA",
+    "Net_Sales_Loc_OA",
+    "Gross_Margin_Loc_OA",
+    "Contribution_Margin_Loc_OA",
+    "Net_Sales_Doc_OA",
+    "Gross_Margin_Doc_OA",
+    "Contribution_Margin_Doc_OA",
+    "Net_Sales_USD_PA",
+    "Gross_Margin_USD_PA",
+    "Contribution_Margin_USD_PA",
+    "Net_Sales_Loc_PA",
+    "Gross_Margin_Loc_PA",
+    "Contribution_Margin_Loc_PA",
+    "Net_Sales_Doc_PA",
+    "Gross_Margin_Doc_PA",
+    "Contribution_Margin_Doc_PA",
+    "Overall_Loc_Doc_exchange_Rate",
+    "Overall_USD_Doc_exchange_Rate",
+    "Loc_Doc_exchange_Rate",
+    "USD_Doc_exchange_Rate"
+FROM :v_SP5 WHERE "Product_Group" <> 'Other'
+UNION ALL
+SELECT
+    "Product_Group",
+    "Channel_Group",
+    "PH1",
+    "PH2",
+    "PH3",
+    "Global_Customer_Group",
+    "ES_Market",
+    "ES_sub_Market",
+    "Business_Group",
+    "Business_Unit",
+    "Business_Segment",
+    "IC_Business_Segment",
+    "Sales_Region",
+    "Sales_Territory",
+    "Country",
+    "Unit_of_Measure",
+    "Local_Currency",
+    "Document_currency",
+    "AP_Reporting_Qty",
+    "AP_Gross_Sales_USD",
+    "AP_Net_Sales_USD",
+    "AP_Cust_Frt_USD",
+    "AP_Dir_Cost_USD",
+    "AP_Per_Cost_USD",
+    "AP_Material_Costs_USD",
+    "AP_Other_Direct_Costs_USD",
+    "AP_Other_Cost_of_Sales_USD",
+    "AP_Gross_Margin_USD",
+    "AP_Contribution_Margin_USD",
+    "AP_Gross_Sales_Loc",
+    "AP_Net_Sales_Loc",
+    "AP_Cust_Frt_Loc",
+    "AP_Dir_Cost_Loc",
+    "AP_Per_Cost_Loc",
+    "AP_Material_Costs_Loc",
+    "AP_Other_Direct_Costs_Loc",
+    "AP_Other_Cost_of_Sales_Loc",
+    "AP_Gross_Margin_Loc",
+    "AP_Contribution_Margin_Loc",
+    "AP_Gross_Sales_Doc",
+    "AP_Net_Sales_Doc",
+    "AP_Cust_Frt_Doc",
+    "AP_Dir_Cost_Doc",
+    "AP_Per_Cost_Doc",
+    "AP_Material_Costs_Doc",
+    "AP_Other_Direct_Costs_Doc",
+    "AP_Other_Cost_of_Sales_Doc",
+    "AP_Gross_Margin_Doc",
+    "AP_Contribution_Margin_Doc",
+    "BP_Reporting_Qty",
+    "BP_Gross_Sales_USD",
+    "BP_Net_Sales_USD",
+    "BP_Cust_Frt_USD",
+    "BP_Dir_Cost_USD",
+    "BP_Per_Cost_USD",
+    "BP_Material_Costs_USD",
+    "BP_Other_Direct_Costs_USD",
+    "BP_Other_Cost_of_Sales_USD",
+    "BP_Gross_Margin_USD",
+    "BP_Contribution_Margin_USD",
+    "BP_Gross_Sales_Loc",
+    "BP_Net_Sales_Loc",
+    "BP_Cust_Frt_Loc",
+    "BP_Dir_Cost_Loc",
+    "BP_Per_Cost_Loc",
+    "BP_Material_Costs_Loc",
+    "BP_Other_Direct_Costs_Loc",
+    "BP_Other_Cost_of_Sales_Loc",
+    "BP_Gross_Margin_Loc",
+    "BP_Contribution_Margin_Loc",
+    "BP_Gross_Sales_Doc",
+    "BP_Net_Sales_Doc",
+    "BP_Cust_Frt_Doc",
+    "BP_Dir_Cost_Doc",
+    "BP_Per_Cost_Doc",
+    "BP_Material_Costs_Doc",
+    "BP_Other_Direct_Costs_Doc",
+    "BP_Other_Cost_of_Sales_Doc",
+    "BP_Gross_Margin_Doc",
+    "BP_Contribution_Margin_Doc",
+    CAST(0 AS float) AS "Net_Sales_USD_OA",
+    CAST(0 AS float) AS "Gross_Margin_USD_OA",
+    CAST(0 AS float) AS "Contribution_Margin_USD_OA",
+    CAST(0 AS float) AS "Net_Sales_Loc_OA",
+    CAST(0 AS float) AS "Gross_Margin_Loc_OA",
+    CAST(0 AS float) AS "Contribution_Margin_Loc_OA",
+    CAST(0 AS float) AS "Net_Sales_Doc_OA",
+    CAST(0 AS float) AS "Gross_Margin_Doc_OA",
+    CAST(0 AS float) AS "Contribution_Margin_Doc_OA",
+    CAST(0 AS float) AS "Net_Sales_USD_PA",
+    CAST(0 AS float) AS "Gross_Margin_USD_PA",
+    CAST(0 AS float) AS "Contribution_Margin_USD_PA",
+    CAST(0 AS float) AS "Net_Sales_Loc_PA",
+    CAST(0 AS float) AS "Gross_Margin_Loc_PA",
+    CAST(0 AS float) AS "Contribution_Margin_Loc_PA",
+    CAST(0 AS float) AS "Net_Sales_Doc_PA",
+    CAST(0 AS float) AS "Gross_Margin_Doc_PA",
+    CAST(0 AS float) AS "Contribution_Margin_Doc_PA",
+    "Overall_Loc_Doc_exchange_Rate",
+    "Overall_USD_Doc_exchange_Rate",
+    "Loc_Doc_exchange_Rate",
+    "USD_Doc_exchange_Rate"
+FROM :v_SP5 WHERE "Product_Group" = 'Other';
+
+/**************************************************
+   * SP6_PVM_Main
+**************************************************/
+-- This outermost SELECT orders the columns per the spec, and is also a good check to make sure
+-- that all of the columns were defined somewhere within the nested queries
+
+v_sp6 = SELECT * ,
+    ("AP_Material_Costs_USD" / "AP_Reporting_Qty" - "BP_Material_Costs_USD" / "BP_Reporting_Qty") * "AP_Reporting_Qty"
+    AS "Price_Impact_Pass_Through_USD",
+    ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_USD_OA"
+    AS "Volume_Impact_NS_USD",
+    ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_USD_OA"
+    AS "Volume_Impact_CM_USD",
+    ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_USD_OA"
+    AS "Volume_Impact_GM_USD",
+    ("Net_Sales_USD_PA" - "Net_Sales_USD_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_NS_USD",
+    ("Contribution_Margin_USD_PA" - "Contribution_Margin_USD_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_CM_USD",
+    ("Gross_Margin_USD_PA" - "Gross_Margin_USD_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_GM_USD",
+    ("BP_Net_Sales_USD" / "BP_Reporting_Qty" - "Net_Sales_USD_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_NS_USD",
+    ("BP_Contribution_Margin_USD" / "BP_Reporting_Qty" -
+     "Contribution_Margin_USD_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_CM_USD",
+    ("BP_Gross_Margin_USD" / "BP_Reporting_Qty" - "Gross_Margin_USD_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_GM_USD",
+/*
+    "AP_Gross_Sales_USD" - ( "AP_Gross_Sales_Doc" *
+        CASE WHEN ("USD_Doc_exchange_Rate" <> 0 ) THEN "USD_Doc_exchange_Rate"
+        ELSE "Overall_USD_Doc_exchange_Rate"
+        END )
+    AS "Cur_Imp_Gross_Sales_USD",
+    "AP_Net_Sales_USD" - ("AP_Net_Sales_Doc" *
+        CASE WHEN ("USD_Doc_exchange_Rate" <> 0 )
+             THEN "USD_Doc_exchange_Rate"
+        ELSE "Overall_USD_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_NS_USD",
+    "AP_Contribution_Margin_USD" - ("AP_Contribution_Margin_Doc" *
+        CASE WHEN ("USD_Doc_exchange_Rate" <> 0 )
+             THEN "USD_Doc_exchange_Rate"
+        ELSE "Overall_USD_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_CM_USD",
+    "AP_Gross_Margin_USD" - ("AP_Gross_Margin_Doc" *
+        CASE
+            WHEN ("USD_Doc_exchange_Rate" <> 0 )
+            THEN "USD_Doc_exchange_Rate"
+            ELSE "Overall_USD_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_GM_USD",
+    "AP_Dir_Cost_USD" - ("AP_Dir_Cost_Doc" *
+        CASE
+            WHEN ("USD_Doc_exchange_Rate" <> 0 )
+            THEN "USD_Doc_exchange_Rate"
+            ELSE "Overall_USD_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Dir_Cost_USD",
+    "AP_Per_Cost_USD" - ("AP_Per_Cost_Doc" *
+        CASE
+            WHEN ("USD_Doc_exchange_Rate" <> 0 )
+            THEN "USD_Doc_exchange_Rate"
+            ELSE "Overall_USD_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Per_Cost_USD",
+    "AP_Cust_Frt_USD" - ("AP_Cust_Frt_Doc" *
+        CASE
+            WHEN ("USD_Doc_exchange_Rate" <> 0 )
+            THEN "USD_Doc_exchange_Rate"
+            ELSE "Overall_USD_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Cust_Frt_USD",
+    "AP_Other_Cost_of_Sales_USD" - ("AP_Other_Cost_of_Sales_Doc" *
+        CASE
+            WHEN ("USD_Doc_exchange_Rate" <> 0 )
+            THEN "USD_Doc_exchange_Rate"
+            ELSE "Overall_USD_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Other_Cost_of_Sales_USD",
+*/    
+    "AP_Gross_Sales_USD" - ( "AP_Gross_Sales_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+       		ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_Gross_Sales_USD"			,
+    "AP_Net_Sales_USD" - ("AP_Net_Sales_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+       		ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_NS_USD"  					,  
+    "AP_Contribution_Margin_USD" - ("AP_Contribution_Margin_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+         	ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_CM_USD"  					,  
+    "AP_Gross_Margin_USD" - ("AP_Gross_Margin_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+       		ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_GM_USD"  					,  
+    "AP_Dir_Cost_USD" - ("AP_Dir_Cost_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+       		ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_Dir_Cost_USD"     		,  
+    "AP_Per_Cost_USD" - ("AP_Per_Cost_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+       		ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_Per_Cost_USD"    			,  
+    "AP_Cust_Frt_USD" - ("AP_Cust_Frt_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+       		ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_Cust_Frt_USD"    			,  
+    "AP_Other_Cost_of_Sales_USD" - ("AP_Other_Cost_of_Sales_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+       		THEN  "USD_Doc_exchange_Rate"
+       		ELSE  "Overall_USD_Doc_exchange_Rate"  END)   AS "Cur_Imp_Other_Cost_of_Sales_USD"	,
+    
+    CASE
+        WHEN "BP_Net_Sales_USD" = 0 THEN 0
+        ELSE "AP_Net_Sales_USD"
+    END AS "Net_Sales_Perceent_USD",
+
+    ("AP_Material_Costs_Loc" / "AP_Reporting_Qty" - "BP_Material_Costs_Loc" / "BP_Reporting_Qty") * "AP_Reporting_Qty"
+    AS "Price_Impact_Pass_Through_Loc",
+     ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_Loc_OA"
+    AS "Volume_Impact_NS_Loc",
+     ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_Loc_OA"
+    AS "Volume_Impact_CM_Loc",
+    ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_Loc_OA"
+    AS "Volume_Impact_GM_Loc",
+    ("Net_Sales_Loc_PA" - "Net_Sales_Loc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_NS_Loc",
+    ("Contribution_Margin_Loc_PA" - "Contribution_Margin_Loc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_CM_Loc",
+    ("Gross_Margin_Loc_PA" - "Gross_Margin_Loc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_GM_Loc",
+    ("BP_Net_Sales_Loc" / "BP_Reporting_Qty" - "Net_Sales_Loc_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_NS_Loc",
+    ("BP_Contribution_Margin_Loc" / "BP_Reporting_Qty" - "Contribution_Margin_Loc_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_CM_Loc",
+    ("BP_Gross_Margin_Loc" / "BP_Reporting_Qty" - "Gross_Margin_Loc_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_GM_Loc",
+/*    
+    "AP_Gross_Sales_Loc" - ("AP_Gross_Sales_Doc" *
+        CASE
+            WHEN ("Loc_Doc_exchange_Rate" <> 0 )
+            THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Gross_Sales_Loc",
+    "AP_Net_Sales_Loc" - ("AP_Net_Sales_Doc" *
+        CASE
+            WHEN ("Loc_Doc_exchange_Rate" <> 0 )
+            THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_NS_Loc",
+    "AP_Contribution_Margin_Loc" - ("AP_Contribution_Margin_Doc" *
+        CASE
+            WHEN ("Loc_Doc_exchange_Rate" <> 0 )
+            THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_CM_Loc", "AP_Gross_Margin_Loc" - ("AP_Gross_Margin_Doc" *
+        CASE
+            WHEN ("Loc_Doc_exchange_Rate" <> 0 )
+            THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_GM_Loc", "AP_Dir_Cost_Loc" - ("AP_Dir_Cost_Doc" *
+        CASE
+            WHEN ("Loc_Doc_exchange_Rate" <> 0)
+            THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Dir_Cost_Loc",
+    "AP_Per_Cost_Loc" - ("AP_Per_Cost_Doc" *
+        CASE
+            WHEN ("Loc_Doc_exchange_Rate" <> 0)
+            THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Per_Cost_Loc", "AP_Cust_Frt_Loc" - ("AP_Cust_Frt_Doc" *
+        CASE
+            WHEN ("Loc_Doc_exchange_Rate" <> 0)
+            THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Cust_Frt_Loc",
+    "AP_Other_Cost_of_Sales_Loc" - ("AP_Other_Cost_of_Sales_Doc" *
+        CASE
+            WHEN "Loc_Doc_exchange_Rate" <> 0 THEN "Loc_Doc_exchange_Rate"
+            ELSE "Overall_Loc_Doc_exchange_Rate"
+        END)
+    AS "Cur_Imp_Other_Cost_of_Sales_Loc",
+*/
+    "AP_Gross_Sales_Loc" - ("AP_Gross_Sales_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_Gross_Sales_Loc",
+    "AP_Net_Sales_Loc" - ("AP_Net_Sales_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_NS_Loc",
+    "AP_Contribution_Margin_Loc" - ("AP_Contribution_Margin_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_CM_Loc", 
+    "AP_Gross_Margin_Loc" - ("AP_Gross_Margin_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_GM_Loc", 
+    "AP_Dir_Cost_Loc" - ("AP_Dir_Cost_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_Dir_Cost_Loc",
+    "AP_Per_Cost_Loc" - ("AP_Per_Cost_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_Per_Cost_Loc", 
+    "AP_Cust_Frt_Loc" - ("AP_Cust_Frt_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_Cust_Frt_Loc",
+    "AP_Other_Cost_of_Sales_Loc" - ("AP_Other_Cost_of_Sales_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END)   AS  "Cur_Imp_Other_Cost_of_Sales_Loc",
+    CASE
+        WHEN "BP_Net_Sales_Loc" = 0 THEN 0
+        ELSE "AP_Net_Sales_Loc"
+    END   AS "Net_Sales_Perceent_Loc",
+    (("AP_Gross_Sales_Doc" / "AP_Reporting_Qty" - "BP_Gross_Sales_Doc" / "BP_Reporting_Qty") * "AP_Reporting_Qty")
+    AS "Price_Impact_Gross_Doc",
+    ("AP_Material_Costs_Doc" / "AP_Reporting_Qty" -
+     "BP_Material_Costs_Doc" / "BP_Reporting_Qty") * "AP_Reporting_Qty"
+    AS "Price_Impact_Pass_Through_Doc",
+     ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_Doc_OA"
+    AS "Volume_Impact_NS_Doc",
+     ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_Doc_OA"
+    AS "Volume_Impact_CM_Doc",
+    ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_Doc_OA"
+    AS "Volume_Impact_GM_Doc",
+    ("Net_Sales_Doc_PA" - "Net_Sales_Doc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_NS_Doc",
+    ("Contribution_Margin_Doc_PA" - "Contribution_Margin_Doc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_CM_Doc",
+    ("Gross_Margin_Doc_PA" - "Gross_Margin_Doc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Product_Mix_Impact_GM_Doc",
+    ("BP_Net_Sales_Doc" / "BP_Reporting_Qty" - "Net_Sales_Doc_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_NS_Doc",
+    ("BP_Contribution_Margin_Doc" / "BP_Reporting_Qty" -
+     "Contribution_Margin_Doc_PA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_CM_Doc",
+    ("BP_Gross_Margin_Doc" / "BP_Reporting_Qty" - "Gross_Margin_Doc_PA") * ("AP_Reporting_Qty" -
+     "BP_Reporting_Qty")
+    AS "Customer_Mix_Impact_GM_Doc",
+    (("BP_Dir_Cost_Doc" / "BP_Reporting_Qty" - "AP_Dir_Cost_Doc" / "AP_Reporting_Qty") * "AP_Reporting_Qty")
+    AS "Dir_Cost_Impact_Doc",
+    (("BP_Per_Cost_Doc" / "BP_Reporting_Qty" - "AP_Per_Cost_Doc" / "AP_Reporting_Qty") * "AP_Reporting_Qty")
+    AS "Per_Cost_Impact_Doc",
+    (("BP_Cust_Frt_Doc" / "BP_Reporting_Qty" - "AP_Cust_Frt_Doc" / "AP_Reporting_Qty") * "AP_Reporting_Qty")
+    AS "Cust_Frt_Impact_Doc",
+    (("BP_Other_Cost_of_Sales_Doc" / "BP_Reporting_Qty" - "AP_Other_Cost_of_Sales_Doc" / "AP_Reporting_Qty") * "AP_Reporting_Qty")
+    AS "Other_Cost_of_Sales_Impact_Doc",
+    CASE WHEN "BP_Net_Sales_Doc" = 0 THEN 0
+         ELSE "AP_Net_Sales_Doc"
+    END
+    AS "Net_Sales_Perceent_Doc"
+  FROM :v_SP5_AP_BP_OA_PA
+  WHERE "AP_Reporting_Qty" <> 0
+    AND "BP_Reporting_Qty" <> 0
+    AND "BP_Net_Sales_Doc" <> 0
+    AND "AP_Net_Sales_Doc" <> 0
+    AND "BP_Net_Sales_USD" <> 0
+    AND "AP_Net_Sales_USD" <> 0
+    AND "Product_Group" <> 'Other';
+
+v_sp6_1 = SELECT *,
+    (("AP_Gross_Sales_USD" / "AP_Reporting_Qty" - "BP_Gross_Sales_USD" / "BP_Reporting_Qty") * "AP_Reporting_Qty") -
+      "Cur_Imp_Gross_Sales_USD"
+    AS "Price_Impact_Gross_USD",
+     ("AP_Gross_Sales_USD" / "AP_Reporting_Qty" -
+      "BP_Gross_Sales_USD" / "BP_Reporting_Qty") * "AP_Reporting_Qty" - "Price_Impact_Pass_Through_USD" -
+     "Cur_Imp_Gross_Sales_USD"
+    AS "Price_Impact_Gross_Asphalt_USD",
+    (("BP_Dir_Cost_USD" / "BP_Reporting_Qty" -
+      "AP_Dir_Cost_USD" / "AP_Reporting_Qty") * "AP_Reporting_Qty") +  "Cur_Imp_Dir_Cost_USD"
+    AS "Dir_Cost_Impact_USD",
+    (("BP_Per_Cost_USD" / "BP_Reporting_Qty" -
+      "AP_Per_Cost_USD" / "AP_Reporting_Qty") * "AP_Reporting_Qty") +   "Cur_Imp_Per_Cost_USD"
+    AS "Per_Cost_Impact_USD",
+    (("BP_Other_Cost_of_Sales_USD" / "BP_Reporting_Qty" -
+      "AP_Other_Cost_of_Sales_USD" / "AP_Reporting_Qty") * "AP_Reporting_Qty") +
+     "Cur_Imp_Other_Cost_of_Sales_USD"
+    AS "Other_Cost_of_Sales_Impact_USD",
+    (("AP_Gross_Sales_Loc" / "AP_Reporting_Qty" -
+      "BP_Gross_Sales_Loc" / "BP_Reporting_Qty") * "AP_Reporting_Qty") -
+     "Cur_Imp_Gross_Sales_Loc"
+    AS "Price_Impact_Gross_Loc",
+     ("AP_Gross_Sales_Loc" / "AP_Reporting_Qty" -
+      "BP_Gross_Sales_Loc" / "BP_Reporting_Qty") * "AP_Reporting_Qty" - "Price_Impact_Pass_Through_Loc" -
+     "Cur_Imp_Gross_Sales_Loc"
+    AS "Price_Impact_Gross_Asphalt_Loc",
+    (("BP_Dir_Cost_Loc" / "BP_Reporting_Qty" -
+      "AP_Dir_Cost_Loc" / "AP_Reporting_Qty") * "AP_Reporting_Qty") + "Cur_Imp_Dir_Cost_Loc"
+    AS "Dir_Cost_Impact_Loc", (("BP_Per_Cost_Loc" / "BP_Reporting_Qty" -
+     "AP_Per_Cost_Loc" / "AP_Reporting_Qty") * "AP_Reporting_Qty") + "Cur_Imp_Per_Cost_Loc"
+    AS "Per_Cost_Impact_Loc",
+    (("BP_Other_Cost_of_Sales_Loc" / "BP_Reporting_Qty" -
+     "AP_Other_Cost_of_Sales_Loc" / "AP_Reporting_Qty") * "AP_Reporting_Qty") +
+     "Cur_Imp_Other_Cost_of_Sales_Loc"
+    AS "Other_Cost_of_Sales_Impact_Loc",
+    (("AP_Net_Sales_Doc" / "AP_Reporting_Qty" -
+      "BP_Net_Sales_Doc" / "BP_Reporting_Qty") * "AP_Reporting_Qty") - "Price_Impact_Gross_Doc"
+    AS "Price_Impact_Net_Doc",
+     ("AP_Gross_Sales_Doc" / "AP_Reporting_Qty" - "BP_Gross_Sales_Doc" / "BP_Reporting_Qty") * "AP_Reporting_Qty" -
+      "Price_Impact_Pass_Through_Doc"
+    AS "Price_Impact_Gross_Asphalt_Doc"
+  FROM :v_sp6;
+
+v_sp6_2 = (SELECT *,
+    (("AP_Net_Sales_USD" / "AP_Reporting_Qty" - "BP_Net_Sales_USD" / "BP_Reporting_Qty") * "AP_Reporting_Qty") -
+    "Price_Impact_Gross_USD" - "Cur_Imp_NS_USD"
+    AS "Price_Impact_Net_USD",
+    ("AP_Net_Sales_USD" / "AP_Reporting_Qty" -
+     "BP_Net_Sales_USD" / "BP_Reporting_Qty") * "AP_Reporting_Qty" - "Price_Impact_Pass_Through_USD" -
+     "Price_Impact_Gross_Asphalt_USD" - "Cur_Imp_NS_USD"
+    AS "Price_Impact_Net_Asphalt_USD",
+    (("BP_Cust_Frt_USD" / "BP_Reporting_Qty" - "AP_Cust_Frt_USD" / "AP_Reporting_Qty") * "AP_Reporting_Qty") +
+     "Cur_Imp_Cust_Frt_USD"
+    AS "Cust_Frt_Impact_USD", (("AP_Net_Sales_Loc" / "AP_Reporting_Qty" -
+     "BP_Net_Sales_Loc" / "BP_Reporting_Qty") * "AP_Reporting_Qty") - "Price_Impact_Gross_Loc" - "Cur_Imp_NS_Loc"
+    AS "Price_Impact_Net_Loc", ("AP_Net_Sales_Loc" / "AP_Reporting_Qty" -
+     "BP_Net_Sales_Loc" / "BP_Reporting_Qty") * "AP_Reporting_Qty" - "Price_Impact_Pass_Through_Loc" -
+     "Price_Impact_Gross_Asphalt_Loc" - "Cur_Imp_NS_Loc"
+    AS "Price_Impact_Net_Asphalt_Loc",
+    (("BP_Cust_Frt_Loc" / "BP_Reporting_Qty" - "AP_Cust_Frt_Loc" / "AP_Reporting_Qty") * "AP_Reporting_Qty") +
+     "Cur_Imp_Cust_Frt_Loc"
+    AS "Cust_Frt_Impact_Loc", ("AP_Net_Sales_Doc" / "AP_Reporting_Qty" -
+     "BP_Net_Sales_Doc" / "BP_Reporting_Qty") * "AP_Reporting_Qty" - "Price_Impact_Pass_Through_Doc" -
+     "Price_Impact_Gross_Asphalt_Doc"
+    AS "Price_Impact_Net_Asphalt_Doc"
+  FROM :v_sp6_1);
+
+
+v_SP6_PVM_Main = SELECT
+     "Product_Group",
+     "Channel_Group",
+     "PH1",
+     "PH2",
+     "PH3",
+     "Global_Customer_Group",
+     "ES_Market",
+     "ES_sub_Market",
+     "Business_Group",
+     "Business_Unit",
+     "Business_Segment",
+     "IC_Business_Segment",
+     "Sales_Region",
+     "Sales_Territory",
+     "Country",
+     "Unit_of_Measure",
+     "Local_Currency",
+     "Document_currency",
+     "AP_Reporting_Qty",
+     "BP_Reporting_Qty",
+     "AP_Gross_Sales_USD",
+     "AP_Net_Sales_USD",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_USD",
+     "AP_Per_Cost_USD",
+     "AP_Material_Costs_USD",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Gross_Margin_USD",
+     "AP_Contribution_Margin_USD",
+     "BP_Gross_Sales_USD",
+     "BP_Net_Sales_USD",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_USD",
+     "BP_Per_Cost_USD",
+     "BP_Material_Costs_USD",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Gross_Margin_USD",
+     "BP_Contribution_Margin_USD",
+     "Net_Sales_USD_OA",
+     "Gross_Margin_USD_OA",
+     "Contribution_Margin_USD_OA",
+     "Net_Sales_USD_PA",
+     "Gross_Margin_USD_PA",
+     "Contribution_Margin_USD_PA",
+     "USD_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     "Price_Impact_Gross_USD",
+     "Price_Impact_Net_USD",
+     "Price_Impact_Gross_Asphalt_USD",
+     "Price_Impact_Net_Asphalt_USD",
+     "Price_Impact_Pass_Through_USD",
+     "Volume_Impact_NS_USD",
+     "Volume_Impact_CM_USD",
+     "Volume_Impact_GM_USD",
+     "Product_Mix_Impact_NS_USD",
+     "Product_Mix_Impact_CM_USD",
+     "Product_Mix_Impact_GM_USD",
+     "Customer_Mix_Impact_NS_USD",
+     "Customer_Mix_Impact_CM_USD",
+     "Customer_Mix_Impact_GM_USD",
+     "Cur_Imp_Gross_Sales_USD",
+     "Cur_Imp_NS_USD",
+     "Cur_Imp_CM_USD",
+     "Cur_Imp_GM_USD",
+     "Cur_Imp_Dir_Cost_USD",
+     "Cur_Imp_Per_Cost_USD",
+     "Cur_Imp_Cust_Frt_USD",
+     "Cur_Imp_Other_Cost_of_Sales_USD",
+     "Dir_Cost_Impact_USD",
+     "Per_Cost_Impact_USD",
+     "Cust_Frt_Impact_USD",
+     "Other_Cost_of_Sales_Impact_USD",
+     "Net_Sales_Perceent_USD",
+     "AP_Gross_Sales_Loc",
+     "AP_Net_Sales_Loc",
+     "AP_Cust_Frt_Loc",
+     "AP_Dir_Cost_Loc",
+     "AP_Per_Cost_Loc",
+     "AP_Material_Costs_Loc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Gross_Margin_Loc",
+     "AP_Contribution_Margin_Loc",
+     "BP_Gross_Sales_Loc",
+     "BP_Net_Sales_Loc",
+     "BP_Cust_Frt_Loc",
+     "BP_Dir_Cost_Loc",
+     "BP_Per_Cost_Loc",
+     "BP_Material_Costs_Loc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Gross_Margin_Loc",
+     "BP_Contribution_Margin_Loc",
+     "Net_Sales_Loc_OA",
+     "Gross_Margin_Loc_OA",
+     "Contribution_Margin_Loc_OA",
+     "Net_Sales_Loc_PA",
+     "Gross_Margin_Loc_PA",
+     "Contribution_Margin_Loc_PA",
+     "Loc_Doc_exchange_Rate",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Price_Impact_Gross_Loc",
+     "Price_Impact_Net_Loc",
+     "Price_Impact_Gross_Asphalt_Loc",
+     "Price_Impact_Net_Asphalt_Loc",
+     "Price_Impact_Pass_Through_Loc",
+     "Volume_Impact_NS_Loc",
+     "Volume_Impact_CM_Loc",
+     "Volume_Impact_GM_Loc",
+     "Product_Mix_Impact_NS_Loc",
+     "Product_Mix_Impact_CM_Loc",
+     "Product_Mix_Impact_GM_Loc",
+     "Customer_Mix_Impact_NS_Loc",
+     "Customer_Mix_Impact_CM_Loc",
+     "Customer_Mix_Impact_GM_Loc",
+     "Cur_Imp_Gross_Sales_Loc",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_GM_Loc",
+     "Cur_Imp_Dir_Cost_Loc",
+     "Cur_Imp_Per_Cost_Loc",
+     "Cur_Imp_Cust_Frt_Loc",
+     "Cur_Imp_Other_Cost_of_Sales_Loc",
+     "Dir_Cost_Impact_Loc",
+     "Per_Cost_Impact_Loc",
+     "Cust_Frt_Impact_Loc",
+     "Other_Cost_of_Sales_Impact_Loc",
+     "Net_Sales_Perceent_Loc",
+     "AP_Gross_Sales_Doc",
+     "AP_Net_Sales_Doc",
+     "AP_Cust_Frt_Doc",
+     "AP_Dir_Cost_Doc",
+     "AP_Per_Cost_Doc",
+     "AP_Material_Costs_Doc",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Gross_Margin_Doc",
+     "AP_Contribution_Margin_Doc",
+     "BP_Gross_Sales_Doc",
+     "BP_Net_Sales_Doc",
+     "BP_Cust_Frt_Doc",
+     "BP_Dir_Cost_Doc",
+     "BP_Per_Cost_Doc",
+     "BP_Material_Costs_Doc",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Gross_Margin_Doc",
+     "BP_Contribution_Margin_Doc",
+     "Net_Sales_Doc_OA",
+     "Gross_Margin_Doc_OA",
+     "Contribution_Margin_Doc_OA",
+     "Net_Sales_Doc_PA",
+     "Gross_Margin_Doc_PA",
+     "Contribution_Margin_Doc_PA",
+     "Price_Impact_Gross_Doc",
+     "Price_Impact_Net_Doc",
+     "Price_Impact_Gross_Asphalt_Doc",
+     "Price_Impact_Net_Asphalt_Doc",
+     "Price_Impact_Pass_Through_Doc",
+     "Volume_Impact_NS_Doc",
+     "Volume_Impact_CM_Doc",
+     "Volume_Impact_GM_Doc",
+     "Product_Mix_Impact_NS_Doc",
+     "Product_Mix_Impact_CM_Doc",
+     "Product_Mix_Impact_GM_Doc",
+     "Customer_Mix_Impact_NS_Doc",
+     "Customer_Mix_Impact_CM_Doc",
+     "Customer_Mix_Impact_GM_Doc",
+     "Dir_Cost_Impact_Doc",
+     "Per_Cost_Impact_Doc",
+     "Cust_Frt_Impact_Doc",
+     "Other_Cost_of_Sales_Impact_Doc",
+     "Net_Sales_Perceent_Doc",
+     'PVM' AS "Reason_Code"
+    FROM :v_sp6_2;
+
+/************************************************
+   * SP7_PVM_Others
+************************************************/
+-- This outermost SELECT orders the columns per the spec, and is also a good check to
+-- make sure that all of the columns were defined somewhere within the nested queries
+
+v_sp7 = SELECT *,
+    "AP_Net_Sales_USD" - ("AP_Net_Sales_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "USD_Doc_exchange_Rate"
+            ELSE  "Overall_USD_Doc_exchange_Rate"
+       END) AS 
+    "Cur_Imp_NS_USD",
+    "AP_Contribution_Margin_USD" - ("AP_Contribution_Margin_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "USD_Doc_exchange_Rate"
+            ELSE  "Overall_USD_Doc_exchange_Rate"
+       END) AS 
+    "Cur_Imp_CM_USD",
+    "AP_Gross_Margin_USD" - ("AP_Gross_Margin_Doc" *
+       CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "USD_Doc_exchange_Rate"
+            ELSE  "Overall_USD_Doc_exchange_Rate"
+       END) AS 
+    "Cur_Imp_GM_USD",
+    "AP_Net_Sales_Loc" - ("AP_Net_Sales_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END) 
+    AS "Cur_Imp_NS_Loc",
+    "AP_Contribution_Margin_Loc" - ("AP_Contribution_Margin_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate",0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END) 
+    AS "Cur_Imp_CM_Loc",
+    "AP_Gross_Margin_Loc" - ("AP_Gross_Margin_Doc" *
+       CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate",0)) <= 0.12)
+            THEN  "Loc_Doc_exchange_Rate"
+            ELSE  "Overall_Loc_Doc_exchange_Rate"
+       END) 
+       AS "Cur_Imp_GM_Loc",
+    "AP_Net_Sales_Doc" - "BP_Net_Sales_Doc"                     AS "Other_Mix_Impact_NS_Doc",
+    "AP_Contribution_Margin_Doc" - "BP_Contribution_Margin_Doc" AS "Other_Mix_Impact_CM_Doc",
+    "AP_Gross_Margin_Doc" - "BP_Gross_Margin_Doc"               AS "Other_Mix_Impact_GM_Doc"
+FROM  :v_SP5_AP_BP_OA_PA
+WHERE "Product_Group" = 'Other';
+
+v_sp7_1 = SELECT *,
+      "AP_Net_Sales_USD" - "BP_Net_Sales_USD" - "Cur_Imp_NS_USD"                     AS "Other_Mix_Impact_NS_USD",
+      "AP_Contribution_Margin_USD" - "BP_Contribution_Margin_USD" - "Cur_Imp_CM_USD" AS "Other_Mix_Impact_CM_USD",
+      "AP_Gross_Margin_USD" - "BP_Gross_Margin_USD" - "Cur_Imp_GM_USD"               AS "Other_Mix_Impact_GM_USD",
+      "AP_Net_Sales_Loc" - "BP_Net_Sales_Loc" - "Cur_Imp_NS_Loc"                     AS "Other_Mix_Impact_NS_Loc",
+      "AP_Contribution_Margin_Loc" - "BP_Contribution_Margin_Loc" - "Cur_Imp_CM_Loc" AS "Other_Mix_Impact_CM_Loc",
+      "AP_Gross_Margin_Loc" - "BP_Gross_Margin_Loc" - "Cur_Imp_GM_Loc"               AS "Other_Mix_Impact_GM_Loc"
+FROM  :v_sp7;
+
+v_SP7_PVM_Others = SELECT
+     "Product_Group",
+     "Channel_Group",
+     "PH1",
+     "PH2",
+     "PH3",
+     "Global_Customer_Group",
+     "ES_Market",
+     "ES_sub_Market",
+     "Business_Group",
+     "Business_Unit",
+     "Business_Segment",
+     "IC_Business_Segment",
+     "Sales_Region",
+     "Sales_Territory",
+     "Country",
+     '' AS "Unit_of_Measure",
+     "Local_Currency",
+     "Document_currency",
+     "AP_Reporting_Qty",
+     "BP_Reporting_Qty",
+     "AP_Gross_Sales_USD",
+     "AP_Net_Sales_USD",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_USD",
+     "AP_Per_Cost_USD",
+     "AP_Material_Costs_USD",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Gross_Margin_USD",
+     "AP_Contribution_Margin_USD",
+     "BP_Gross_Sales_USD",
+     "BP_Net_Sales_USD",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_USD",
+     "BP_Per_Cost_USD",
+     "BP_Material_Costs_USD",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Gross_Margin_USD",
+     "BP_Contribution_Margin_USD",
+     "Net_Sales_USD_OA",
+     "Gross_Margin_USD_OA",
+     "Contribution_Margin_USD_OA",
+     "Net_Sales_USD_PA",
+     "Gross_Margin_USD_PA",
+     "USD_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     "Contribution_Margin_USD_PA",
+     "Cur_Imp_NS_USD",
+     "Cur_Imp_CM_USD",
+     "Cur_Imp_GM_USD",
+     "Other_Mix_Impact_NS_USD",
+     "Other_Mix_Impact_CM_USD",
+     "Other_Mix_Impact_GM_USD",
+     "AP_Gross_Sales_Loc",
+     "AP_Net_Sales_Loc",
+     "AP_Cust_Frt_Loc",
+     "AP_Dir_Cost_Loc",
+     "AP_Per_Cost_Loc",
+     "AP_Material_Costs_Loc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Gross_Margin_Loc",
+     "AP_Contribution_Margin_Loc",
+     "BP_Gross_Sales_Loc",
+     "BP_Net_Sales_Loc",
+     "BP_Cust_Frt_Loc",
+     "BP_Dir_Cost_Loc",
+     "BP_Per_Cost_Loc",
+     "BP_Material_Costs_Loc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Gross_Margin_Loc",
+     "BP_Contribution_Margin_Loc",
+     "Net_Sales_Loc_OA",
+     "Gross_Margin_Loc_OA",
+     "Contribution_Margin_Loc_OA",
+     "Net_Sales_Loc_PA",
+     "Gross_Margin_Loc_PA",
+     "Contribution_Margin_Loc_PA",
+     "Loc_Doc_exchange_Rate",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_GM_Loc",
+     "Other_Mix_Impact_NS_Loc",
+     "Other_Mix_Impact_CM_Loc",
+     "Other_Mix_Impact_GM_Loc",
+     "AP_Gross_Sales_Doc",
+     "AP_Net_Sales_Doc",
+     "AP_Cust_Frt_Doc",
+     "AP_Dir_Cost_Doc",
+     "AP_Per_Cost_Doc",
+     "AP_Material_Costs_Doc",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Gross_Margin_Doc",
+     "AP_Contribution_Margin_Doc",
+     "BP_Gross_Sales_Doc",
+     "BP_Net_Sales_Doc",
+     "BP_Cust_Frt_Doc",
+     "BP_Dir_Cost_Doc",
+     "BP_Per_Cost_Doc",
+     "BP_Material_Costs_Doc",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Gross_Margin_Doc",
+     "BP_Contribution_Margin_Doc",
+     "Other_Mix_Impact_NS_Doc",
+     "Other_Mix_Impact_CM_Doc",
+     "Other_Mix_Impact_GM_Doc",
+     'Others' AS "Reason_Code",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA"
+FROM :v_sp7_1;
+
+
+/************************************************
+   * SP10_PVM_ZeroUnits_Int
+************************************************/
+v_sp10 = SELECT *,
+/* copy from MS SQL, but may cause division by zero error.*/
+      "AP_Net_Sales_USD" - ("AP_Net_Sales_Doc" *
+       	  CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+               THEN  "USD_Doc_exchange_Rate"
+               ELSE  "Overall_USD_Doc_exchange_Rate"  END)           AS "Cur_Imp_NS_USD",
+      "AP_Contribution_Margin_USD" - ("AP_Contribution_Margin_Doc" *
+       	  CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+               THEN  "USD_Doc_exchange_Rate"
+               ELSE  "Overall_USD_Doc_exchange_Rate"  END)           AS "Cur_Imp_CM_USD",
+      "AP_Gross_Margin_USD" - ("AP_Gross_Margin_Doc" *
+       	  CASE WHEN ("USD_Doc_exchange_Rate" <> 0 AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)	
+               THEN  "USD_Doc_exchange_Rate"
+               ELSE  "Overall_USD_Doc_exchange_Rate"  END)           AS "Cur_Imp_GM_USD",
+      "AP_Net_Sales_Loc" - ("AP_Net_Sales_Doc" *
+       	  CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate",0)) <= 0.12)
+               THEN  "Loc_Doc_exchange_Rate"
+               ELSE  "Overall_Loc_Doc_exchange_Rate"  END)           AS "Cur_Imp_NS_Loc",
+      "AP_Contribution_Margin_Loc" - ("AP_Contribution_Margin_Doc" *
+          CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate",0)) <= 0.12)
+               THEN  "Loc_Doc_exchange_Rate"
+               ELSE  "Overall_Loc_Doc_exchange_Rate"  END)           AS "Cur_Imp_CM_Loc",
+      "AP_Gross_Margin_Loc" - ("AP_Gross_Margin_Doc" *
+       	  CASE WHEN ("Loc_Doc_exchange_Rate" <> 0 AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate",0)) <= 0.12)
+               THEN  "Loc_Doc_exchange_Rate"
+               ELSE  "Overall_Loc_Doc_exchange_Rate"  END)           AS "Cur_Imp_GM_Loc",
+      "AP_Net_Sales_Doc" - "BP_Net_Sales_Doc"                        AS "Other_Mix_Impact_NS_Doc",
+      "AP_Contribution_Margin_Doc" - "BP_Contribution_Margin_Doc"    AS "Other_Mix_Impact_CM_Doc",
+      "AP_Gross_Margin_Doc" - "BP_Gross_Margin_Doc"                  AS "Other_Mix_Impact_GM_Doc"
+FROM  :v_SP5_AP_BP_OA_PA
+WHERE ("AP_Reporting_Qty" = 0 OR "BP_Reporting_Qty" = 0   OR
+       "AP_Net_Sales_Doc" = 0 OR "BP_Net_Sales_Doc" = 0   OR
+       "AP_Net_Sales_USD" = 0 OR "BP_Net_Sales_USD" = 0 ) AND
+       "Product_Group" <> 'Other';
+
+v_SP10_PVM_ZeroUnits_Int = SELECT *,
+      "AP_Net_Sales_USD" - "BP_Net_Sales_USD" - "Cur_Imp_NS_USD"                      AS "Other_Mix_Impact_NS_USD",
+      "AP_Contribution_Margin_USD" - "BP_Contribution_Margin_USD" - "Cur_Imp_CM_USD"  AS "Other_Mix_Impact_CM_USD",
+      "AP_Gross_Margin_USD" - "BP_Gross_Margin_USD" - "Cur_Imp_GM_USD"                AS "Other_Mix_Impact_GM_USD",
+      "AP_Net_Sales_Loc" - "BP_Net_Sales_Loc" - "Cur_Imp_NS_Loc"                      AS "Other_Mix_Impact_NS_Loc",
+      "AP_Contribution_Margin_Loc" - "BP_Contribution_Margin_Loc" - "Cur_Imp_CM_Loc"  AS "Other_Mix_Impact_CM_Loc",
+      "AP_Gross_Margin_Loc" - "BP_Gross_Margin_Loc" - "Cur_Imp_GM_Loc"                AS "Other_Mix_Impact_GM_Loc"
+FROM  :v_sp10;
+
+
+/************************************************
+   * SP11_PVM_ZeroUnits
+************************************************/
+v_SP11_PVM_ZeroUnits = SELECT
+       "Product_Group",
+       "Channel_Group",
+       "PH1",
+       "PH2",
+       "PH3",
+       "Global_Customer_Group",
+       "ES_Market",
+       "ES_sub_Market",
+       "Business_Group",
+       "Business_Unit",
+       "Business_Segment",
+       "IC_Business_Segment",
+       "Sales_Region",
+       "Sales_Territory",
+       "Country",
+       "Unit_of_Measure",
+       "Local_Currency",
+       "Document_currency",
+       'Zero Units' AS "Reason_Code",
+       "AP_Reporting_Qty",
+       "BP_Reporting_Qty",
+       "AP_Gross_Sales_USD",
+       "AP_Net_Sales_USD",
+       "AP_Cust_Frt_USD",
+       "AP_Dir_Cost_USD",
+       "AP_Per_Cost_USD",
+       "AP_Material_Costs_USD",
+       "AP_Other_Direct_Costs_USD",
+       "AP_Other_Cost_of_Sales_USD",
+       "AP_Gross_Margin_USD",
+       "AP_Contribution_Margin_USD",
+       "BP_Gross_Sales_USD",
+       "BP_Net_Sales_USD",
+       "BP_Cust_Frt_USD",
+       "BP_Dir_Cost_USD",
+       "BP_Per_Cost_USD",
+       "BP_Material_Costs_USD",
+       "BP_Other_Direct_Costs_USD",
+       "BP_Other_Cost_of_Sales_USD",
+       "BP_Gross_Margin_USD",
+       "BP_Contribution_Margin_USD",
+       "Net_Sales_USD_OA",
+       "Gross_Margin_USD_OA",
+       "Contribution_Margin_USD_OA",
+       "Net_Sales_USD_PA",
+       "Gross_Margin_USD_PA",
+       "USD_Doc_exchange_Rate",
+       "Overall_USD_Doc_exchange_Rate",
+       "Contribution_Margin_USD_PA",
+       "Cur_Imp_NS_USD",
+       "Cur_Imp_CM_USD",
+       "Cur_Imp_GM_USD",
+       "Other_Mix_Impact_NS_USD",
+       "Other_Mix_Impact_CM_USD",
+       "Other_Mix_Impact_GM_USD",
+       "AP_Gross_Sales_Loc",
+       "AP_Net_Sales_Loc",
+       "AP_Cust_Frt_Loc",
+       "AP_Dir_Cost_Loc",
+       "AP_Per_Cost_Loc",
+       "AP_Material_Costs_Loc",
+       "AP_Other_Direct_Costs_Loc",
+       "AP_Other_Cost_of_Sales_Loc",
+       "AP_Gross_Margin_Loc",
+       "AP_Contribution_Margin_Loc",
+       "BP_Gross_Sales_Loc",
+       "BP_Net_Sales_Loc",
+       "BP_Cust_Frt_Loc",
+       "BP_Dir_Cost_Loc",
+       "BP_Per_Cost_Loc",
+       "BP_Material_Costs_Loc",
+       "BP_Other_Direct_Costs_Loc",
+       "BP_Other_Cost_of_Sales_Loc",
+       "BP_Gross_Margin_Loc",
+       "BP_Contribution_Margin_Loc",
+       "Net_Sales_Loc_OA",
+       "Gross_Margin_Loc_OA",
+       "Contribution_Margin_Loc_OA",
+       "Net_Sales_Loc_PA",
+       "Gross_Margin_Loc_PA",
+       "Contribution_Margin_Loc_PA",
+       "Loc_Doc_exchange_Rate",
+       "Overall_Loc_Doc_exchange_Rate",
+       "Cur_Imp_NS_Loc",
+       "Cur_Imp_CM_Loc",
+       "Cur_Imp_GM_Loc",
+       "Other_Mix_Impact_NS_Loc",
+       "Other_Mix_Impact_CM_Loc",
+       "Other_Mix_Impact_GM_Loc",
+       "AP_Gross_Sales_Doc",
+       "AP_Net_Sales_Doc",
+       "AP_Cust_Frt_Doc",
+       "AP_Dir_Cost_Doc",
+       "AP_Per_Cost_Doc",
+       "AP_Material_Costs_Doc",
+       "AP_Other_Direct_Costs_Doc",
+       "AP_Other_Cost_of_Sales_Doc",
+       "AP_Gross_Margin_Doc",
+       "AP_Contribution_Margin_Doc",
+       "BP_Gross_Sales_Doc",
+       "BP_Net_Sales_Doc",
+       "BP_Cust_Frt_Doc",
+       "BP_Dir_Cost_Doc",
+       "BP_Per_Cost_Doc",
+       "BP_Material_Costs_Doc",
+       "BP_Other_Direct_Costs_Doc",
+       "BP_Other_Cost_of_Sales_Doc",
+       "BP_Gross_Margin_Doc",
+       "BP_Contribution_Margin_Doc",
+       "Other_Mix_Impact_NS_Doc",
+       "Other_Mix_Impact_CM_Doc",
+       "Other_Mix_Impact_GM_Doc",
+       "Contribution_Margin_Doc_OA",
+       "Contribution_Margin_Doc_PA",
+       "Gross_Margin_Doc_OA",
+       "Gross_Margin_Doc_PA",
+       "Net_Sales_Doc_OA",
+       "Net_Sales_Doc_PA"
+FROM   :v_SP10_PVM_ZeroUnits_Int
+WHERE  "AP_Reporting_Qty" = 0
+  AND  "BP_Reporting_Qty" = 0;
+
+
+/************************************************
+   * SP12_PVM_No_APBP
+************************************************/
+v_sp12 = SELECT *,
+   'AP and BP No qty' AS "Reason_Code",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_USD_OA"                               AS "Volume_Impact_NS_USD",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_USD_OA"                     AS "Volume_Impact_CM_USD",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_USD_OA"                            AS "Volume_Impact_GM_USD",
+   ("Net_Sales_USD_PA" - "Net_Sales_USD_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")        AS "Product_Mix_Impact_NS_USD",
+   ("Contribution_Margin_USD_PA" - "Contribution_Margin_USD_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+   AS "Product_Mix_Impact_CM_USD",
+   ("Gross_Margin_USD_PA" - "Gross_Margin_USD_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")  AS "Product_Mix_Impact_GM_USD",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_Loc_OA"                               AS "Volume_Impact_NS_Loc",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_Loc_OA"                     AS "Volume_Impact_CM_Loc",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_Loc_OA"                            AS "Volume_Impact_GM_Loc",
+   ("Net_Sales_Loc_PA" - "Net_Sales_Loc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")        AS "Product_Mix_Impact_NS_Loc",
+   ("Contribution_Margin_Loc_PA" - "Contribution_Margin_Loc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+   AS "Product_Mix_Impact_CM_Loc",
+   ("Gross_Margin_Loc_PA" - "Gross_Margin_Loc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")  AS "Product_Mix_Impact_GM_Loc",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_Doc_OA"                               AS "Volume_Impact_NS_Doc",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_Doc_OA"                     AS "Volume_Impact_CM_Doc",
+   ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_Doc_OA"                            AS "Volume_Impact_GM_Doc",
+   ("Net_Sales_Doc_PA" - "Net_Sales_Doc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")        AS "Product_Mix_Impact_NS_Doc",
+   ("Contribution_Margin_Doc_PA" - "Contribution_Margin_Doc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")
+   AS "Product_Mix_Impact_CM_Doc",
+   ("Gross_Margin_Doc_PA" - "Gross_Margin_Doc_OA") * ("AP_Reporting_Qty" - "BP_Reporting_Qty")  AS "Product_Mix_Impact_GM_Doc"
+FROM :v_SP10_PVM_ZeroUnits_Int SP10
+WHERE ("AP_Reporting_Qty" <> 0
+   OR  "BP_Reporting_Qty" <> 0)
+AND EXISTS ( SELECT * FROM :v_SP4_PA SP4
+             WHERE SP4."Product_Group"    = SP10."Product_Group"
+             AND   SP4."Business_Segment" = SP10."Business_Segment");
+
+v_sp12_1 = SELECT *,
+   ("AP_Net_Sales_USD" - "BP_Net_Sales_USD") - "Volume_Impact_NS_USD" - "Product_Mix_Impact_NS_USD" - "Cur_Imp_NS_USD"
+   AS "Customer_Mix_Impact_NS_USD",
+   ("AP_Contribution_Margin_USD" - "BP_Contribution_Margin_USD") - "Volume_Impact_CM_USD" - "Product_Mix_Impact_CM_USD" - "Cur_Imp_CM_USD"
+   AS "Customer_Mix_Impact_CM_USD",
+   ("AP_Gross_Margin_USD" - "BP_Gross_Margin_USD") - "Volume_Impact_GM_USD" - "Product_Mix_Impact_GM_USD" - "Cur_Imp_GM_USD"
+   AS "Customer_Mix_Impact_GM_USD",
+   ("AP_Net_Sales_Loc" - "BP_Net_Sales_Loc") - "Volume_Impact_NS_Loc" - "Product_Mix_Impact_NS_Loc" - "Cur_Imp_NS_Loc"
+   AS "Customer_Mix_Impact_NS_Loc",
+   ("AP_Contribution_Margin_Loc" - "BP_Contribution_Margin_Loc") - "Volume_Impact_CM_Loc" - "Product_Mix_Impact_CM_Loc" - "Cur_Imp_CM_Loc"
+   AS "Customer_Mix_Impact_CM_Loc",
+   ("AP_Gross_Margin_Loc" - "BP_Gross_Margin_Loc") - "Volume_Impact_GM_Loc" - "Product_Mix_Impact_GM_Loc" - "Cur_Imp_GM_Loc"
+   AS "Customer_Mix_Impact_GM_Loc",
+   ("AP_Net_Sales_Doc" - "BP_Net_Sales_Doc") - "Volume_Impact_NS_Doc" - "Product_Mix_Impact_NS_Doc"
+   AS "Customer_Mix_Impact_NS_Doc",
+   ("AP_Contribution_Margin_Doc" - "BP_Contribution_Margin_Doc") - "Volume_Impact_CM_Doc" - "Product_Mix_Impact_CM_Doc"
+   AS "Customer_Mix_Impact_CM_Doc",
+   ("AP_Gross_Margin_Doc" - "BP_Gross_Margin_Doc") - "Volume_Impact_GM_Doc" - "Product_Mix_Impact_GM_Doc"
+   AS "Customer_Mix_Impact_GM_Doc"
+ FROM :v_sp12;
+
+v_SP12_PVM_No_APBP = SELECT
+     "Product_Group",
+     "Channel_Group",
+     "PH1",
+     "PH2",
+     "PH3",
+     "Global_Customer_Group",
+     "ES_Market",
+     "ES_sub_Market",
+     "Business_Group",
+     "Business_Unit",
+     "Business_Segment",
+     "IC_Business_Segment",
+     "Sales_Region",
+     "Sales_Territory",
+     "Country",
+     "Unit_of_Measure",
+     "Local_Currency",
+     "Document_currency",
+     "Reason_Code",
+     "AP_Reporting_Qty",
+     "BP_Reporting_Qty",
+     "AP_Gross_Sales_USD",
+     "AP_Net_Sales_USD",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_USD",
+     "AP_Per_Cost_USD",
+     "AP_Material_Costs_USD",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Gross_Margin_USD",
+     "AP_Contribution_Margin_USD",
+     "BP_Gross_Sales_USD",
+     "BP_Net_Sales_USD",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_USD",
+     "BP_Per_Cost_USD",
+     "BP_Material_Costs_USD",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Gross_Margin_USD",
+     "BP_Contribution_Margin_USD",
+     "Net_Sales_USD_OA",
+     "Gross_Margin_USD_OA",
+     "Contribution_Margin_USD_OA",
+     "Net_Sales_USD_PA",
+     "Gross_Margin_USD_PA",
+     "USD_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     "Contribution_Margin_USD_PA",
+     "Cur_Imp_NS_USD",
+     "Cur_Imp_CM_USD",
+     "Cur_Imp_GM_USD",
+     "Volume_Impact_NS_USD",
+     "Volume_Impact_CM_USD",
+     "Volume_Impact_GM_USD",
+     "Product_Mix_Impact_NS_USD",
+     "Product_Mix_Impact_CM_USD",
+     "Product_Mix_Impact_GM_USD",
+     "Customer_Mix_Impact_NS_USD",
+     "Customer_Mix_Impact_CM_USD",
+     "Customer_Mix_Impact_GM_USD",
+     "AP_Gross_Sales_Loc",
+     "AP_Net_Sales_Loc",
+     "AP_Cust_Frt_Loc",
+     "AP_Dir_Cost_Loc",
+     "AP_Per_Cost_Loc",
+     "AP_Material_Costs_Loc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Gross_Margin_Loc",
+     "AP_Contribution_Margin_Loc",
+     "BP_Gross_Sales_Loc",
+     "BP_Net_Sales_Loc",
+     "BP_Cust_Frt_Loc",
+     "BP_Dir_Cost_Loc",
+     "BP_Per_Cost_Loc",
+     "BP_Material_Costs_Loc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Gross_Margin_Loc",
+     "BP_Contribution_Margin_Loc",
+     "Net_Sales_Loc_OA",
+     "Gross_Margin_Loc_OA",
+     "Contribution_Margin_Loc_OA",
+     "Net_Sales_Loc_PA",
+     "Gross_Margin_Loc_PA",
+     "Contribution_Margin_Loc_PA",
+     "Loc_Doc_exchange_Rate",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_GM_Loc",
+     "Volume_Impact_NS_Loc",
+     "Volume_Impact_CM_Loc",
+     "Volume_Impact_GM_Loc",
+     "Product_Mix_Impact_NS_Loc",
+     "Product_Mix_Impact_CM_Loc",
+     "Product_Mix_Impact_GM_Loc",
+     "Customer_Mix_Impact_NS_Loc",
+     "Customer_Mix_Impact_CM_Loc",
+     "Customer_Mix_Impact_GM_Loc",
+     "AP_Gross_Sales_Doc",
+     "AP_Net_Sales_Doc",
+     "AP_Cust_Frt_Doc",
+     "AP_Dir_Cost_Doc",
+     "AP_Per_Cost_Doc",
+     "AP_Material_Costs_Doc",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Gross_Margin_Doc",
+     "AP_Contribution_Margin_Doc",
+     "BP_Gross_Sales_Doc",
+     "BP_Net_Sales_Doc",
+     "BP_Cust_Frt_Doc",
+     "BP_Dir_Cost_Doc",
+     "BP_Per_Cost_Doc",
+     "BP_Material_Costs_Doc",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Gross_Margin_Doc",
+     "BP_Contribution_Margin_Doc",
+     "Volume_Impact_NS_Doc",
+     "Volume_Impact_CM_Doc",
+     "Volume_Impact_GM_Doc",
+     "Product_Mix_Impact_NS_Doc",
+     "Product_Mix_Impact_CM_Doc",
+     "Product_Mix_Impact_GM_Doc",
+     "Customer_Mix_Impact_NS_Doc",
+     "Customer_Mix_Impact_CM_Doc",
+     "Customer_Mix_Impact_GM_Doc",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA"
+FROM :v_sp12_1;
+
+/************************************************
+   * SP13_PVM_No_Base
+************************************************/
+v_sp13 = SELECT *,
+      'Product not sold in Base' AS "Reason_Code",
+      ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_USD_OA"           AS "Volume_Impact_NS_USD",
+      ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_USD_OA" AS "Volume_Impact_CM_USD",
+      ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_USD_OA"        AS "Volume_Impact_GM_USD",
+      ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_Loc_OA"           AS "Volume_Impact_NS_Loc",
+      ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_Loc_OA" AS "Volume_Impact_CM_Loc",
+      ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_Loc_OA"        AS "Volume_Impact_GM_Loc"
+FROM  :v_SP10_PVM_ZeroUnits_Int SP10
+WHERE ("AP_Reporting_Qty" <> 0 OR "BP_Reporting_Qty" <> 0)
+AND NOT EXISTS (SELECT * FROM :v_SP4_PA SP4
+                WHERE SP4."Product_Group"    = SP10."Product_Group"
+                AND   SP4."Business_Segment" = SP10."Business_Segment");
+
+v_sp13_1 = SELECT *,
+     ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Net_Sales_Doc_OA"                                            AS "Volume_Impact_NS_Doc",
+     ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Contribution_Margin_Doc_OA"                                  AS "Volume_Impact_CM_Doc",
+     ("AP_Reporting_Qty" - "BP_Reporting_Qty") * "Gross_Margin_Doc_OA"                                         AS "Volume_Impact_GM_Doc",
+     ("AP_Net_Sales_USD" - "BP_Net_Sales_USD") - "Volume_Impact_NS_USD" - "Cur_Imp_NS_USD"                     AS "Product_Mix_Impact_NS_USD",
+     ("AP_Contribution_Margin_USD" - "BP_Contribution_Margin_USD") - "Volume_Impact_CM_USD" - "Cur_Imp_CM_USD" AS "Product_Mix_Impact_CM_USD",
+     ("AP_Gross_Margin_USD" - "BP_Gross_Margin_USD") - "Volume_Impact_GM_USD" - "Cur_Imp_GM_USD"               AS "Product_Mix_Impact_GM_USD",
+     ("AP_Net_Sales_Loc" - "BP_Net_Sales_Loc") - "Volume_Impact_NS_Loc" - "Cur_Imp_NS_Loc"                     AS "Product_Mix_Impact_NS_Loc",
+     ("AP_Contribution_Margin_Loc" - "BP_Contribution_Margin_Loc") - "Volume_Impact_CM_Loc" - "Cur_Imp_CM_Loc" AS "Product_Mix_Impact_CM_Loc",
+     ("AP_Gross_Margin_Loc" - "BP_Gross_Margin_Loc") - "Volume_Impact_GM_Loc" - "Cur_Imp_GM_Loc"               AS "Product_Mix_Impact_GM_Loc"
+FROM :v_sp13;
+
+v_sp13_2 = SELECT *,
+     ("AP_Net_Sales_Doc" - "BP_Net_Sales_Doc") - "Volume_Impact_NS_Doc"                     AS "Product_Mix_Impact_NS_Doc",
+     ("AP_Contribution_Margin_Doc" - "BP_Contribution_Margin_Doc") - "Volume_Impact_CM_Doc" AS "Product_Mix_Impact_CM_Doc",
+     ("AP_Gross_Margin_Doc" - "BP_Gross_Margin_Doc") - "Volume_Impact_GM_Doc"               AS "Product_Mix_Impact_GM_Doc"
+FROM :v_sp13_1;
+
+v_SP13_PVM_No_Base = SELECT
+     "Product_Group",
+     "Channel_Group",
+     "PH1",
+     "PH2",
+     "PH3",
+     "Global_Customer_Group",
+     "ES_Market",
+     "ES_sub_Market",
+     "Business_Group",
+     "Business_Unit",
+     "Business_Segment",
+     "IC_Business_Segment",
+     "Sales_Region",
+     "Sales_Territory",
+     "Country",
+     "Unit_of_Measure",
+     "Local_Currency",
+     "Document_currency",
+     "Reason_Code",
+     "AP_Reporting_Qty",
+     "BP_Reporting_Qty",
+     "AP_Gross_Sales_USD",
+     "AP_Net_Sales_USD",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_USD",
+     "AP_Per_Cost_USD",
+     "AP_Material_Costs_USD",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Gross_Margin_USD",
+     "AP_Contribution_Margin_USD",
+     "BP_Gross_Sales_USD",
+     "BP_Net_Sales_USD",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_USD",
+     "BP_Per_Cost_USD",
+     "BP_Material_Costs_USD",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Gross_Margin_USD",
+     "BP_Contribution_Margin_USD",
+     "Net_Sales_USD_OA",
+     "Gross_Margin_USD_OA",
+     "Contribution_Margin_USD_OA",
+     "Net_Sales_USD_PA",
+     "Gross_Margin_USD_PA",
+     "USD_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     "Contribution_Margin_USD_PA",
+     "Cur_Imp_NS_USD",
+     "Cur_Imp_CM_USD",
+     "Cur_Imp_GM_USD",
+     "Volume_Impact_NS_USD",
+     "Volume_Impact_CM_USD",
+     "Volume_Impact_GM_USD",
+     "Product_Mix_Impact_NS_USD",
+     "Product_Mix_Impact_CM_USD",
+     "Product_Mix_Impact_GM_USD",
+     "AP_Gross_Sales_Loc",
+     "AP_Net_Sales_Loc",
+     "AP_Cust_Frt_Loc",
+     "AP_Dir_Cost_Loc",
+     "AP_Per_Cost_Loc",
+     "AP_Material_Costs_Loc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Gross_Margin_Loc",
+     "AP_Contribution_Margin_Loc",
+     "BP_Gross_Sales_Loc",
+     "BP_Net_Sales_Loc",
+     "BP_Cust_Frt_Loc",
+     "BP_Dir_Cost_Loc",
+     "BP_Per_Cost_Loc",
+     "BP_Material_Costs_Loc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Gross_Margin_Loc",
+     "BP_Contribution_Margin_Loc",
+     "Net_Sales_Loc_OA",
+     "Gross_Margin_Loc_OA",
+     "Contribution_Margin_Loc_OA",
+     "Net_Sales_Loc_PA",
+     "Gross_Margin_Loc_PA",
+     "Contribution_Margin_Loc_PA",
+     "Loc_Doc_exchange_Rate",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_GM_Loc",
+     "Volume_Impact_NS_Loc",
+     "Volume_Impact_CM_Loc",
+     "Volume_Impact_GM_Loc",
+     "Product_Mix_Impact_NS_Loc",
+     "Product_Mix_Impact_CM_Loc",
+     "Product_Mix_Impact_GM_Loc",
+     "AP_Gross_Sales_Doc",
+     "AP_Net_Sales_Doc",
+     "AP_Cust_Frt_Doc",
+     "AP_Dir_Cost_Doc",
+     "AP_Per_Cost_Doc",
+     "AP_Material_Costs_Doc",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Gross_Margin_Doc",
+     "AP_Contribution_Margin_Doc",
+     "BP_Gross_Sales_Doc",
+     "BP_Net_Sales_Doc",
+     "BP_Cust_Frt_Doc",
+     "BP_Dir_Cost_Doc",
+     "BP_Per_Cost_Doc",
+     "BP_Material_Costs_Doc",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Gross_Margin_Doc",
+     "BP_Contribution_Margin_Doc",
+     "Volume_Impact_NS_Doc",
+     "Volume_Impact_CM_Doc",
+     "Volume_Impact_GM_Doc",
+     "Product_Mix_Impact_NS_Doc",
+     "Product_Mix_Impact_CM_Doc",
+     "Product_Mix_Impact_GM_Doc",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA"
+FROM :v_sp13_2;
+
+
+/************************************************
+   * tmpPriceVolumeMix
+************************************************/
+v_unionall =
+SELECT
+     "AP_Contribution_Margin_Doc",
+     "AP_Contribution_Margin_Loc",
+     "AP_Contribution_Margin_USD",
+     "AP_Cust_Frt_Doc",
+     "AP_Cust_Frt_Loc",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_Doc",
+     "AP_Dir_Cost_Loc",
+     "AP_Dir_Cost_USD",
+     "AP_Gross_Margin_Doc",
+     "AP_Gross_Margin_Loc",
+     "AP_Gross_Margin_USD",
+     "AP_Gross_Sales_Doc",
+     "AP_Gross_Sales_Loc",
+     "AP_Gross_Sales_USD",
+     "AP_Material_Costs_Doc",
+     "AP_Material_Costs_Loc",
+     "AP_Material_Costs_USD",
+     "AP_Net_Sales_Doc",
+     "AP_Net_Sales_Loc",
+     "AP_Net_Sales_USD",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Per_Cost_Doc",
+     "AP_Per_Cost_Loc",
+     "AP_Per_Cost_USD",
+     "AP_Reporting_Qty",
+     "BP_Contribution_Margin_Doc",
+     "BP_Contribution_Margin_Loc",
+     "BP_Contribution_Margin_USD",
+     "BP_Cust_Frt_Doc",
+     "BP_Cust_Frt_Loc",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_Doc",
+     "BP_Dir_Cost_Loc",
+     "BP_Dir_Cost_USD",
+     "BP_Gross_Margin_Doc",
+     "BP_Gross_Margin_Loc",
+     "BP_Gross_Margin_USD",
+     "BP_Gross_Sales_Doc",
+     "BP_Gross_Sales_Loc",
+     "BP_Gross_Sales_USD",
+     "BP_Material_Costs_Doc",
+     "BP_Material_Costs_Loc",
+     "BP_Material_Costs_USD",
+     "BP_Net_Sales_Doc",
+     "BP_Net_Sales_Loc",
+     "BP_Net_Sales_USD",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Per_Cost_Doc",
+     "BP_Per_Cost_Loc",
+     "BP_Per_Cost_USD",
+     "BP_Reporting_Qty",
+     "Business_Group",
+     "Business_Segment",
+     "Business_Unit",
+     "Channel_Group",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Contribution_Margin_Loc_OA",
+     "Contribution_Margin_Loc_PA",
+     "Contribution_Margin_USD_OA",
+     "Contribution_Margin_USD_PA",
+     "Country",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_CM_USD",
+     "Cur_Imp_Cust_Frt_Loc",
+     "Cur_Imp_Cust_Frt_USD",
+     "Cur_Imp_Dir_Cost_Loc",
+     "Cur_Imp_Dir_Cost_USD",
+     "Cur_Imp_GM_Loc",
+     "Cur_Imp_GM_USD",
+     "Cur_Imp_Gross_Sales_Loc",
+     "Cur_Imp_Gross_Sales_USD",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_NS_USD",
+     "Cur_Imp_Other_Cost_of_Sales_Loc",
+     "Cur_Imp_Other_Cost_of_Sales_USD",
+     "Cur_Imp_Per_Cost_Loc",
+     "Cur_Imp_Per_Cost_USD",
+     "Cust_Frt_Impact_Doc",
+     "Cust_Frt_Impact_Loc",
+     "Cust_Frt_Impact_USD",
+     "Customer_Mix_Impact_CM_Doc",
+     "Customer_Mix_Impact_CM_Loc",
+     "Customer_Mix_Impact_CM_USD",
+     "Customer_Mix_Impact_GM_Doc",
+     "Customer_Mix_Impact_GM_Loc",
+     "Customer_Mix_Impact_GM_USD",
+     "Customer_Mix_Impact_NS_Doc",
+     "Customer_Mix_Impact_NS_Loc",
+     "Customer_Mix_Impact_NS_USD",
+     "Dir_Cost_Impact_Doc",
+     "Dir_Cost_Impact_Loc",
+     "Dir_Cost_Impact_USD",
+     "Document_currency",
+     "ES_Market",
+     "ES_sub_Market",
+     "Global_Customer_Group",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Gross_Margin_Loc_OA",
+     "Gross_Margin_Loc_PA",
+     "Gross_Margin_USD_OA",
+     "Gross_Margin_USD_PA",
+     "IC_Business_Segment",
+     "Loc_Doc_exchange_Rate",
+     "Local_Currency",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA",
+     "Net_Sales_Loc_OA",
+     "Net_Sales_Loc_PA",
+     "Net_Sales_Perceent_Doc",
+     "Net_Sales_Perceent_Loc",
+     "Net_Sales_Perceent_USD",
+     "Net_Sales_USD_OA",
+     "Net_Sales_USD_PA",
+     "Other_Cost_of_Sales_Impact_Doc",
+     "Other_Cost_of_Sales_Impact_Loc",
+     "Other_Cost_of_Sales_Impact_USD",
+     0 AS "Other_Mix_Impact_CM_Doc",
+     0 AS "Other_Mix_Impact_CM_Loc",
+     0 AS "Other_Mix_Impact_CM_USD",
+     0 AS "Other_Mix_Impact_GM_Doc",
+     0 AS "Other_Mix_Impact_GM_Loc",
+     0 AS "Other_Mix_Impact_GM_USD",
+     0 AS "Other_Mix_Impact_NS_Doc",
+     0 AS "Other_Mix_Impact_NS_Loc",
+     0 AS "Other_Mix_Impact_NS_USD",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     "Per_Cost_Impact_Doc",
+     "Per_Cost_Impact_Loc",
+     "Per_Cost_Impact_USD",
+     "PH1",
+     "PH2",
+     "PH3",
+     "Price_Impact_Net_Doc",
+     "Price_Impact_Net_Loc",
+     "Price_Impact_Net_USD",
+     "Price_Impact_Gross_Asphalt_Doc",
+     "Price_Impact_Gross_Asphalt_Loc",
+     "Price_Impact_Gross_Asphalt_USD",
+     "Price_Impact_Gross_Doc",
+     "Price_Impact_Gross_Loc",
+     "Price_Impact_Gross_USD",
+     "Price_Impact_Net_Asphalt_Doc",
+     "Price_Impact_Net_Asphalt_Loc",
+     "Price_Impact_Net_Asphalt_USD",
+     "Price_Impact_Pass_Through_Doc",
+     "Price_Impact_Pass_Through_Loc",
+     "Price_Impact_Pass_Through_USD",
+     "Product_Group",
+     "Product_Mix_Impact_CM_Doc",
+     "Product_Mix_Impact_CM_Loc",
+     "Product_Mix_Impact_CM_USD",
+     "Product_Mix_Impact_GM_Doc",
+     "Product_Mix_Impact_GM_Loc",
+     "Product_Mix_Impact_GM_USD",
+     "Product_Mix_Impact_NS_Doc",
+     "Product_Mix_Impact_NS_Loc",
+     "Product_Mix_Impact_NS_USD",
+     "Reason_Code",
+     "Sales_Region",
+     "Sales_Territory",
+     "Unit_of_Measure",
+     "USD_Doc_exchange_Rate",
+     "Volume_Impact_CM_Doc",
+     "Volume_Impact_CM_Loc",
+     "Volume_Impact_CM_USD",
+     "Volume_Impact_GM_Doc",
+     "Volume_Impact_GM_Loc",
+     "Volume_Impact_GM_USD",
+     "Volume_Impact_NS_Doc",
+     "Volume_Impact_NS_Loc",
+     "Volume_Impact_NS_USD"
+FROM :v_SP6_PVM_Main
+UNION ALL
+SELECT
+     "AP_Contribution_Margin_Doc",
+     "AP_Contribution_Margin_Loc",
+     "AP_Contribution_Margin_USD",
+     "AP_Cust_Frt_Doc",
+     "AP_Cust_Frt_Loc",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_Doc",
+     "AP_Dir_Cost_Loc",
+     "AP_Dir_Cost_USD",
+     "AP_Gross_Margin_Doc",
+     "AP_Gross_Margin_Loc",
+     "AP_Gross_Margin_USD",
+     "AP_Gross_Sales_Doc",
+     "AP_Gross_Sales_Loc",
+     "AP_Gross_Sales_USD",
+     "AP_Material_Costs_Doc",
+     "AP_Material_Costs_Loc",
+     "AP_Material_Costs_USD",
+     "AP_Net_Sales_Doc",
+     "AP_Net_Sales_Loc",
+     "AP_Net_Sales_USD",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Per_Cost_Doc",
+     "AP_Per_Cost_Loc",
+     "AP_Per_Cost_USD",
+     "AP_Reporting_Qty",
+     "BP_Contribution_Margin_Doc",
+     "BP_Contribution_Margin_Loc",
+     "BP_Contribution_Margin_USD",
+     "BP_Cust_Frt_Doc",
+     "BP_Cust_Frt_Loc",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_Doc",
+     "BP_Dir_Cost_Loc",
+     "BP_Dir_Cost_USD",
+     "BP_Gross_Margin_Doc",
+     "BP_Gross_Margin_Loc",
+     "BP_Gross_Margin_USD",
+     "BP_Gross_Sales_Doc",
+     "BP_Gross_Sales_Loc",
+     "BP_Gross_Sales_USD",
+     "BP_Material_Costs_Doc",
+     "BP_Material_Costs_Loc",
+     "BP_Material_Costs_USD",
+     "BP_Net_Sales_Doc",
+     "BP_Net_Sales_Loc",
+     "BP_Net_Sales_USD",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Per_Cost_Doc",
+     "BP_Per_Cost_Loc",
+     "BP_Per_Cost_USD",
+     "BP_Reporting_Qty",
+     "Business_Group",
+     "Business_Segment",
+     "Business_Unit",
+     "Channel_Group",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Contribution_Margin_Loc_OA",
+     "Contribution_Margin_Loc_PA",
+     "Contribution_Margin_USD_OA",
+     "Contribution_Margin_USD_PA",
+     "Country",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_CM_USD",
+     0 AS "Cur_Imp_Cust_Frt_Loc",
+     0 AS "Cur_Imp_Cust_Frt_USD",
+     0 AS "Cur_Imp_Dir_Cost_Loc",
+     0 AS "Cur_Imp_Dir_Cost_USD",
+     "Cur_Imp_GM_Loc",
+     "Cur_Imp_GM_USD",
+     0 AS "Cur_Imp_Gross_Sales_Loc",
+     0 AS "Cur_Imp_Gross_Sales_USD",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_NS_USD",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_Loc",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_USD",
+     0 AS "Cur_Imp_Per_Cost_Loc",
+     0 AS "Cur_Imp_Per_Cost_USD",
+     0 AS "Cust_Frt_Impact_Doc",
+     0 AS "Cust_Frt_Impact_Loc",
+     0 AS "Cust_Frt_Impact_USD",
+     0 AS "Customer_Mix_Impact_CM_Doc",
+     0 AS "Customer_Mix_Impact_CM_Loc",
+     0 AS "Customer_Mix_Impact_CM_USD",
+     0 AS "Customer_Mix_Impact_GM_Doc",
+     0 AS "Customer_Mix_Impact_GM_Loc",
+     0 AS "Customer_Mix_Impact_GM_USD",
+     0 AS "Customer_Mix_Impact_NS_Doc",
+     0 AS "Customer_Mix_Impact_NS_Loc",
+     0 AS "Customer_Mix_Impact_NS_USD",
+     0 AS "Dir_Cost_Impact_Doc",
+     0 AS "Dir_Cost_Impact_Loc",
+     0 AS "Dir_Cost_Impact_USD",
+     "Document_currency",
+     "ES_Market",
+     "ES_sub_Market",
+     "Global_Customer_Group",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Gross_Margin_Loc_OA",
+     "Gross_Margin_Loc_PA",
+     "Gross_Margin_USD_OA",
+     "Gross_Margin_USD_PA",
+     "IC_Business_Segment",
+     "Loc_Doc_exchange_Rate",
+     "Local_Currency",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA",
+     "Net_Sales_Loc_OA",
+     "Net_Sales_Loc_PA",
+     0 AS "Net_Sales_Perceent_Doc",
+     0 AS "Net_Sales_Perceent_Loc",
+     0 AS "Net_Sales_Perceent_USD",
+     "Net_Sales_USD_OA",
+     "Net_Sales_USD_PA",
+     0 AS "Other_Cost_of_Sales_Impact_Doc",
+     0 AS "Other_Cost_of_Sales_Impact_Loc",
+     0 AS "Other_Cost_of_Sales_Impact_USD",
+     "Other_Mix_Impact_CM_Doc",
+     "Other_Mix_Impact_CM_Loc",
+     "Other_Mix_Impact_CM_USD",
+     "Other_Mix_Impact_GM_Doc",
+     "Other_Mix_Impact_GM_Loc",
+     "Other_Mix_Impact_GM_USD",
+     "Other_Mix_Impact_NS_Doc",
+     "Other_Mix_Impact_NS_Loc",
+     "Other_Mix_Impact_NS_USD",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     0 AS "Per_Cost_Impact_Doc",
+     0 AS "Per_Cost_Impact_Loc",
+     0 AS "Per_Cost_Impact_USD",
+     "PH1",
+     "PH2",
+     "PH3",
+     0 AS "Price_Impact_Net_Doc",
+     0 AS "Price_Impact_Net_Loc",
+     0 AS "Price_Impact_Net_USD",
+     0 AS "Price_Impact_Gross_Asphalt_Doc",
+     0 AS "Price_Impact_Gross_Asphalt_Loc",
+     0 AS "Price_Impact_Gross_Asphalt_USD",
+     0 AS "Price_Impact_Gross_Doc",
+     0 AS "Price_Impact_Gross_Loc",
+     0 AS "Price_Impact_Gross_USD",
+     0 AS "Price_Impact_Net_Asphalt_Doc",
+     0 AS "Price_Impact_Net_Asphalt_Loc",
+     0 AS "Price_Impact_Net_Asphalt_USD",
+     0 AS "Price_Impact_Pass_Through_Doc",
+     0 AS "Price_Impact_Pass_Through_Loc",
+     0 AS "Price_Impact_Pass_Through_USD",
+     "Product_Group",
+     0 AS "Product_Mix_Impact_CM_Doc",
+     0 AS "Product_Mix_Impact_CM_Loc",
+     0 AS "Product_Mix_Impact_CM_USD",
+     0 AS "Product_Mix_Impact_GM_Doc",
+     0 AS "Product_Mix_Impact_GM_Loc",
+     0 AS "Product_Mix_Impact_GM_USD",
+     0 AS "Product_Mix_Impact_NS_Doc",
+     0 AS "Product_Mix_Impact_NS_Loc",
+     0 AS "Product_Mix_Impact_NS_USD",
+     "Reason_Code",
+     "Sales_Region",
+     "Sales_Territory",
+     "Unit_of_Measure",
+     "USD_Doc_exchange_Rate",
+     0 AS "Volume_Impact_CM_Doc",
+     0 AS "Volume_Impact_CM_Loc",
+     0 AS "Volume_Impact_CM_USD",
+     0 AS "Volume_Impact_GM_Doc",
+     0 AS "Volume_Impact_GM_Loc",
+     0 AS "Volume_Impact_GM_USD",
+     0 AS "Volume_Impact_NS_Doc",
+     0 AS "Volume_Impact_NS_Loc",
+     0 AS "Volume_Impact_NS_USD"
+FROM :v_SP7_PVM_Others
+UNION ALL
+SELECT
+     "AP_Contribution_Margin_Doc",
+     "AP_Contribution_Margin_Loc",
+     "AP_Contribution_Margin_USD",
+     "AP_Cust_Frt_Doc",
+     "AP_Cust_Frt_Loc",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_Doc",
+     "AP_Dir_Cost_Loc",
+     "AP_Dir_Cost_USD",
+     "AP_Gross_Margin_Doc",
+     "AP_Gross_Margin_Loc",
+     "AP_Gross_Margin_USD",
+     "AP_Gross_Sales_Doc",
+     "AP_Gross_Sales_Loc",
+     "AP_Gross_Sales_USD",
+     "AP_Material_Costs_Doc",
+     "AP_Material_Costs_Loc",
+     "AP_Material_Costs_USD",
+     "AP_Net_Sales_Doc",
+     "AP_Net_Sales_Loc",
+     "AP_Net_Sales_USD",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Per_Cost_Doc",
+     "AP_Per_Cost_Loc",
+     "AP_Per_Cost_USD",
+     "AP_Reporting_Qty",
+     "BP_Contribution_Margin_Doc",
+     "BP_Contribution_Margin_Loc",
+     "BP_Contribution_Margin_USD",
+     "BP_Cust_Frt_Doc",
+     "BP_Cust_Frt_Loc",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_Doc",
+     "BP_Dir_Cost_Loc",
+     "BP_Dir_Cost_USD",
+     "BP_Gross_Margin_Doc",
+     "BP_Gross_Margin_Loc",
+     "BP_Gross_Margin_USD",
+     "BP_Gross_Sales_Doc",
+     "BP_Gross_Sales_Loc",
+     "BP_Gross_Sales_USD",
+     "BP_Material_Costs_Doc",
+     "BP_Material_Costs_Loc",
+     "BP_Material_Costs_USD",
+     "BP_Net_Sales_Doc",
+     "BP_Net_Sales_Loc",
+     "BP_Net_Sales_USD",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Per_Cost_Doc",
+     "BP_Per_Cost_Loc",
+     "BP_Per_Cost_USD",
+     "BP_Reporting_Qty",
+     "Business_Group",
+     "Business_Segment",
+     "Business_Unit",
+     "Channel_Group",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Contribution_Margin_Loc_OA",
+     "Contribution_Margin_Loc_PA",
+     "Contribution_Margin_USD_OA",
+     "Contribution_Margin_USD_PA",
+     "Country",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_CM_USD",
+     0 AS "Cur_Imp_Cust_Frt_Loc",
+     0 AS "Cur_Imp_Cust_Frt_USD",
+     0 AS "Cur_Imp_Dir_Cost_Loc",
+     0 AS "Cur_Imp_Dir_Cost_USD",
+     "Cur_Imp_GM_Loc",
+     "Cur_Imp_GM_USD",
+     0 AS "Cur_Imp_Gross_Sales_Loc",
+     0 AS "Cur_Imp_Gross_Sales_USD",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_NS_USD",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_Loc",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_USD",
+     0 AS "Cur_Imp_Per_Cost_Loc",
+     0 AS "Cur_Imp_Per_Cost_USD",
+     0 AS "Cust_Frt_Impact_Doc",
+     0 AS "Cust_Frt_Impact_Loc",
+     0 AS "Cust_Frt_Impact_USD",
+     0 AS "Customer_Mix_Impact_CM_Doc",
+     0 AS "Customer_Mix_Impact_CM_Loc",
+     0 AS "Customer_Mix_Impact_CM_USD",
+     0 AS "Customer_Mix_Impact_GM_Doc",
+     0 AS "Customer_Mix_Impact_GM_Loc",
+     0 AS "Customer_Mix_Impact_GM_USD",
+     0 AS "Customer_Mix_Impact_NS_Doc",
+     0 AS "Customer_Mix_Impact_NS_Loc",
+     0 AS "Customer_Mix_Impact_NS_USD",
+     0 AS "Dir_Cost_Impact_Doc",
+     0 AS "Dir_Cost_Impact_Loc",
+     0 AS "Dir_Cost_Impact_USD",
+     "Document_currency",
+     "ES_Market",
+     "ES_sub_Market",
+     "Global_Customer_Group",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Gross_Margin_Loc_OA",
+     "Gross_Margin_Loc_PA",
+     "Gross_Margin_USD_OA",
+     "Gross_Margin_USD_PA",
+     "IC_Business_Segment",
+     "Loc_Doc_exchange_Rate",
+     "Local_Currency",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA",
+     "Net_Sales_Loc_OA",
+     "Net_Sales_Loc_PA",
+     0 AS "Net_Sales_Perceent_Doc",
+     0 AS "Net_Sales_Perceent_Loc",
+     0 AS "Net_Sales_Perceent_USD",
+     "Net_Sales_USD_OA",
+     "Net_Sales_USD_PA",
+     0 AS "Other_Cost_of_Sales_Impact_Doc",
+     0 AS "Other_Cost_of_Sales_Impact_Loc",
+     0 AS "Other_Cost_of_Sales_Impact_USD",
+     "Other_Mix_Impact_CM_Doc",
+     "Other_Mix_Impact_CM_Loc",
+     "Other_Mix_Impact_CM_USD",
+     "Other_Mix_Impact_GM_Doc",
+     "Other_Mix_Impact_GM_Loc",
+     "Other_Mix_Impact_GM_USD",
+     "Other_Mix_Impact_NS_Doc",
+     "Other_Mix_Impact_NS_Loc",
+     "Other_Mix_Impact_NS_USD",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     0 AS "Per_Cost_Impact_Doc",
+     0 AS "Per_Cost_Impact_Loc",
+     0 AS "Per_Cost_Impact_USD",
+     "PH1",
+     "PH2",
+     "PH3",
+     0 AS "Price_Impact_Net_Doc",
+     0 AS "Price_Impact_Net_Loc",
+     0 AS "Price_Impact_Net_USD",
+     0 AS "Price_Impact_Gross_Asphalt_Doc",
+     0 AS "Price_Impact_Gross_Asphalt_Loc",
+     0 AS "Price_Impact_Gross_Asphalt_USD",
+     0 AS "Price_Impact_Gross_Doc",
+     0 AS "Price_Impact_Gross_Loc",
+     0 AS "Price_Impact_Gross_USD",
+     0 AS "Price_Impact_Net_Asphalt_Doc",
+     0 AS "Price_Impact_Net_Asphalt_Loc",
+     0 AS "Price_Impact_Net_Asphalt_USD",
+     0 AS "Price_Impact_Pass_Through_Doc",
+     0 AS "Price_Impact_Pass_Through_Loc",
+     0 AS "Price_Impact_Pass_Through_USD",
+     "Product_Group",
+     0 AS "Product_Mix_Impact_CM_Doc",
+     0 AS "Product_Mix_Impact_CM_Loc",
+     0 AS "Product_Mix_Impact_CM_USD",
+     0 AS "Product_Mix_Impact_GM_Doc",
+     0 AS "Product_Mix_Impact_GM_Loc",
+     0 AS "Product_Mix_Impact_GM_USD",
+     0 AS "Product_Mix_Impact_NS_Doc",
+     0 AS "Product_Mix_Impact_NS_Loc",
+     0 AS "Product_Mix_Impact_NS_USD",
+     "Reason_Code",
+     "Sales_Region",
+     "Sales_Territory",
+     "Unit_of_Measure",
+     "USD_Doc_exchange_Rate",
+     0 AS "Volume_Impact_CM_Doc",
+     0 AS "Volume_Impact_CM_Loc",
+     0 AS "Volume_Impact_CM_USD",
+     0 AS "Volume_Impact_GM_Doc",
+     0 AS "Volume_Impact_GM_Loc",
+     0 AS "Volume_Impact_GM_USD",
+     0 AS "Volume_Impact_NS_Doc",
+     0 AS "Volume_Impact_NS_Loc",
+     0 AS "Volume_Impact_NS_USD"
+FROM :v_SP11_PVM_ZeroUnits
+UNION ALL
+SELECT
+     "AP_Contribution_Margin_Doc",
+     "AP_Contribution_Margin_Loc",
+     "AP_Contribution_Margin_USD",
+     "AP_Cust_Frt_Doc",
+     "AP_Cust_Frt_Loc",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_Doc",
+     "AP_Dir_Cost_Loc",
+     "AP_Dir_Cost_USD",
+     "AP_Gross_Margin_Doc",
+     "AP_Gross_Margin_Loc",
+     "AP_Gross_Margin_USD",
+     "AP_Gross_Sales_Doc",
+     "AP_Gross_Sales_Loc",
+     "AP_Gross_Sales_USD",
+     "AP_Material_Costs_Doc",
+     "AP_Material_Costs_Loc",
+     "AP_Material_Costs_USD",
+     "AP_Net_Sales_Doc",
+     "AP_Net_Sales_Loc",
+     "AP_Net_Sales_USD",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Per_Cost_Doc",
+     "AP_Per_Cost_Loc",
+     "AP_Per_Cost_USD",
+     "AP_Reporting_Qty",
+     "BP_Contribution_Margin_Doc",
+     "BP_Contribution_Margin_Loc",
+     "BP_Contribution_Margin_USD",
+     "BP_Cust_Frt_Doc",
+     "BP_Cust_Frt_Loc",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_Doc",
+     "BP_Dir_Cost_Loc",
+     "BP_Dir_Cost_USD",
+     "BP_Gross_Margin_Doc",
+     "BP_Gross_Margin_Loc",
+     "BP_Gross_Margin_USD",
+     "BP_Gross_Sales_Doc",
+     "BP_Gross_Sales_Loc",
+     "BP_Gross_Sales_USD",
+     "BP_Material_Costs_Doc",
+     "BP_Material_Costs_Loc",
+     "BP_Material_Costs_USD",
+     "BP_Net_Sales_Doc",
+     "BP_Net_Sales_Loc",
+     "BP_Net_Sales_USD",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Per_Cost_Doc",
+     "BP_Per_Cost_Loc",
+     "BP_Per_Cost_USD",
+     "BP_Reporting_Qty",
+     "Business_Group",
+     "Business_Segment",
+     "Business_Unit",
+     "Channel_Group",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Contribution_Margin_Loc_OA",
+     "Contribution_Margin_Loc_PA",
+     "Contribution_Margin_USD_OA",
+     "Contribution_Margin_USD_PA",
+     "Country",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_CM_USD",
+     0 AS "Cur_Imp_Cust_Frt_Loc",
+     0 AS "Cur_Imp_Cust_Frt_USD",
+     0 AS "Cur_Imp_Dir_Cost_Loc",
+     0 AS "Cur_Imp_Dir_Cost_USD",
+     "Cur_Imp_GM_Loc",
+     "Cur_Imp_GM_USD",
+     0 AS "Cur_Imp_Gross_Sales_Loc",
+     0 AS "Cur_Imp_Gross_Sales_USD",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_NS_USD",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_Loc",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_USD",
+     0 AS "Cur_Imp_Per_Cost_Loc",
+     0 AS "Cur_Imp_Per_Cost_USD",
+     0 AS "Cust_Frt_Impact_Doc",
+     0 AS "Cust_Frt_Impact_Loc",
+     0 AS "Cust_Frt_Impact_USD",
+     "Customer_Mix_Impact_CM_Doc",
+     "Customer_Mix_Impact_CM_Loc",
+     "Customer_Mix_Impact_CM_USD",
+     "Customer_Mix_Impact_GM_Doc",
+     "Customer_Mix_Impact_GM_Loc",
+     "Customer_Mix_Impact_GM_USD",
+     "Customer_Mix_Impact_NS_Doc",
+     "Customer_Mix_Impact_NS_Loc",
+     "Customer_Mix_Impact_NS_USD",
+     0 AS "Dir_Cost_Impact_Doc",
+     0 AS "Dir_Cost_Impact_Loc",
+     0 AS "Dir_Cost_Impact_USD",
+     "Document_currency",
+     "ES_Market",
+     "ES_sub_Market",
+     "Global_Customer_Group",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Gross_Margin_Loc_OA",
+     "Gross_Margin_Loc_PA",
+     "Gross_Margin_USD_OA",
+     "Gross_Margin_USD_PA",
+     "IC_Business_Segment",
+     "Loc_Doc_exchange_Rate",
+     "Local_Currency",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA",
+     "Net_Sales_Loc_OA",
+     "Net_Sales_Loc_PA",
+     0 AS "Net_Sales_Perceent_Doc",
+     0 AS "Net_Sales_Perceent_Loc",
+     0 AS "Net_Sales_Perceent_USD",
+     "Net_Sales_USD_OA",
+     "Net_Sales_USD_PA",
+     0 AS "Other_Cost_of_Sales_Impact_Doc",
+     0 AS "Other_Cost_of_Sales_Impact_Loc",
+     0 AS "Other_Cost_of_Sales_Impact_USD",
+     0 AS "Other_Mix_Impact_CM_Doc",
+     0 AS "Other_Mix_Impact_CM_Loc",
+     0 AS "Other_Mix_Impact_CM_USD",
+     0 AS "Other_Mix_Impact_GM_Doc",
+     0 AS "Other_Mix_Impact_GM_Loc",
+     0 AS "Other_Mix_Impact_GM_USD",
+     0 AS "Other_Mix_Impact_NS_Doc",
+     0 AS "Other_Mix_Impact_NS_Loc",
+     0 AS "Other_Mix_Impact_NS_USD",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     0 AS "Per_Cost_Impact_Doc",
+     0 AS "Per_Cost_Impact_Loc",
+     0 AS "Per_Cost_Impact_USD",
+     "PH1",
+     "PH2",
+     "PH3",
+     0 AS "Price_Impact_Net_Doc",
+     0 AS "Price_Impact_Net_Loc",
+     0 AS "Price_Impact_Net_USD",
+     0 AS "Price_Impact_Gross_Asphalt_Doc",
+     0 AS "Price_Impact_Gross_Asphalt_Loc",
+     0 AS "Price_Impact_Gross_Asphalt_USD",
+     0 AS "Price_Impact_Gross_Doc",
+     0 AS "Price_Impact_Gross_Loc",
+     0 AS "Price_Impact_Gross_USD",
+     0 AS "Price_Impact_Net_Asphalt_Doc",
+     0 AS "Price_Impact_Net_Asphalt_Loc",
+     0 AS "Price_Impact_Net_Asphalt_USD",
+     0 AS "Price_Impact_Pass_Through_Doc",
+     0 AS "Price_Impact_Pass_Through_Loc",
+     0 AS "Price_Impact_Pass_Through_USD",
+     "Product_Group",
+     "Product_Mix_Impact_CM_Doc",
+     "Product_Mix_Impact_CM_Loc",
+     "Product_Mix_Impact_CM_USD",
+     "Product_Mix_Impact_GM_Doc",
+     "Product_Mix_Impact_GM_Loc",
+     "Product_Mix_Impact_GM_USD",
+     "Product_Mix_Impact_NS_Doc",
+     "Product_Mix_Impact_NS_Loc",
+     "Product_Mix_Impact_NS_USD",
+     "Reason_Code",
+     "Sales_Region",
+     "Sales_Territory",
+     "Unit_of_Measure",
+     "USD_Doc_exchange_Rate",
+     "Volume_Impact_CM_Doc",
+     "Volume_Impact_CM_Loc",
+     "Volume_Impact_CM_USD",
+     "Volume_Impact_GM_Doc",
+     "Volume_Impact_GM_Loc",
+     "Volume_Impact_GM_USD",
+     "Volume_Impact_NS_Doc",
+     "Volume_Impact_NS_Loc",
+     "Volume_Impact_NS_USD"
+FROM :v_SP12_PVM_No_APBP
+UNION ALL
+SELECT
+     "AP_Contribution_Margin_Doc",
+     "AP_Contribution_Margin_Loc",
+     "AP_Contribution_Margin_USD",
+     "AP_Cust_Frt_Doc",
+     "AP_Cust_Frt_Loc",
+     "AP_Cust_Frt_USD",
+     "AP_Dir_Cost_Doc",
+     "AP_Dir_Cost_Loc",
+     "AP_Dir_Cost_USD",
+     "AP_Gross_Margin_Doc",
+     "AP_Gross_Margin_Loc",
+     "AP_Gross_Margin_USD",
+     "AP_Gross_Sales_Doc",
+     "AP_Gross_Sales_Loc",
+     "AP_Gross_Sales_USD",
+     "AP_Material_Costs_Doc",
+     "AP_Material_Costs_Loc",
+     "AP_Material_Costs_USD",
+     "AP_Net_Sales_Doc",
+     "AP_Net_Sales_Loc",
+     "AP_Net_Sales_USD",
+     "AP_Other_Cost_of_Sales_Doc",
+     "AP_Other_Cost_of_Sales_Loc",
+     "AP_Other_Cost_of_Sales_USD",
+     "AP_Other_Direct_Costs_Doc",
+     "AP_Other_Direct_Costs_Loc",
+     "AP_Other_Direct_Costs_USD",
+     "AP_Per_Cost_Doc",
+     "AP_Per_Cost_Loc",
+     "AP_Per_Cost_USD",
+     "AP_Reporting_Qty",
+     "BP_Contribution_Margin_Doc",
+     "BP_Contribution_Margin_Loc",
+     "BP_Contribution_Margin_USD",
+     "BP_Cust_Frt_Doc",
+     "BP_Cust_Frt_Loc",
+     "BP_Cust_Frt_USD",
+     "BP_Dir_Cost_Doc",
+     "BP_Dir_Cost_Loc",
+     "BP_Dir_Cost_USD",
+     "BP_Gross_Margin_Doc",
+     "BP_Gross_Margin_Loc",
+     "BP_Gross_Margin_USD",
+     "BP_Gross_Sales_Doc",
+     "BP_Gross_Sales_Loc",
+     "BP_Gross_Sales_USD",
+     "BP_Material_Costs_Doc",
+     "BP_Material_Costs_Loc",
+     "BP_Material_Costs_USD",
+     "BP_Net_Sales_Doc",
+     "BP_Net_Sales_Loc",
+     "BP_Net_Sales_USD",
+     "BP_Other_Cost_of_Sales_Doc",
+     "BP_Other_Cost_of_Sales_Loc",
+     "BP_Other_Cost_of_Sales_USD",
+     "BP_Other_Direct_Costs_Doc",
+     "BP_Other_Direct_Costs_Loc",
+     "BP_Other_Direct_Costs_USD",
+     "BP_Per_Cost_Doc",
+     "BP_Per_Cost_Loc",
+     "BP_Per_Cost_USD",
+     "BP_Reporting_Qty",
+     "Business_Group",
+     "Business_Segment",
+     "Business_Unit",
+     "Channel_Group",
+     "Contribution_Margin_Doc_OA",
+     "Contribution_Margin_Doc_PA",
+     "Contribution_Margin_Loc_OA",
+     "Contribution_Margin_Loc_PA",
+     "Contribution_Margin_USD_OA",
+     "Contribution_Margin_USD_PA",
+     "Country",
+     "Cur_Imp_CM_Loc",
+     "Cur_Imp_CM_USD",
+     0 AS "Cur_Imp_Cust_Frt_Loc",
+     0 AS "Cur_Imp_Cust_Frt_USD",
+     0 AS "Cur_Imp_Dir_Cost_Loc",
+     0 AS "Cur_Imp_Dir_Cost_USD",
+     "Cur_Imp_GM_Loc",
+     "Cur_Imp_GM_USD",
+     0 AS "Cur_Imp_Gross_Sales_Loc",
+     0 AS "Cur_Imp_Gross_Sales_USD",
+     "Cur_Imp_NS_Loc",
+     "Cur_Imp_NS_USD",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_Loc",
+     0 AS "Cur_Imp_Other_Cost_of_Sales_USD",
+     0 AS "Cur_Imp_Per_Cost_Loc",
+     0 AS "Cur_Imp_Per_Cost_USD",
+     0 AS "Cust_Frt_Impact_Doc",
+     0 AS "Cust_Frt_Impact_Loc",
+     0 AS "Cust_Frt_Impact_USD",
+     0 AS "Customer_Mix_Impact_CM_Doc",
+     0 AS "Customer_Mix_Impact_CM_Loc",
+     0 AS "Customer_Mix_Impact_CM_USD",
+     0 AS "Customer_Mix_Impact_GM_Doc",
+     0 AS "Customer_Mix_Impact_GM_Loc",
+     0 AS "Customer_Mix_Impact_GM_USD",
+     0 AS "Customer_Mix_Impact_NS_Doc",
+     0 AS "Customer_Mix_Impact_NS_Loc",
+     0 AS "Customer_Mix_Impact_NS_USD",
+     0 AS "Dir_Cost_Impact_Doc",
+     0 AS "Dir_Cost_Impact_Loc",
+     0 AS "Dir_Cost_Impact_USD",
+     "Document_currency",
+     "ES_Market",
+     "ES_sub_Market",
+     "Global_Customer_Group",
+     "Gross_Margin_Doc_OA",
+     "Gross_Margin_Doc_PA",
+     "Gross_Margin_Loc_OA",
+     "Gross_Margin_Loc_PA",
+     "Gross_Margin_USD_OA",
+     "Gross_Margin_USD_PA",
+     "IC_Business_Segment",
+     "Loc_Doc_exchange_Rate",
+     "Local_Currency",
+     "Net_Sales_Doc_OA",
+     "Net_Sales_Doc_PA",
+     "Net_Sales_Loc_OA",
+     "Net_Sales_Loc_PA",
+     0 AS "Net_Sales_Perceent_Doc",
+     0 AS "Net_Sales_Perceent_Loc",
+     0 AS "Net_Sales_Perceent_USD",
+     "Net_Sales_USD_OA",
+     "Net_Sales_USD_PA",
+     0 AS "Other_Cost_of_Sales_Impact_Doc",
+     0 AS "Other_Cost_of_Sales_Impact_Loc",
+     0 AS "Other_Cost_of_Sales_Impact_USD",
+     0 AS "Other_Mix_Impact_CM_Doc",
+     0 AS "Other_Mix_Impact_CM_Loc",
+     0 AS "Other_Mix_Impact_CM_USD",
+     0 AS "Other_Mix_Impact_GM_Doc",
+     0 AS "Other_Mix_Impact_GM_Loc",
+     0 AS "Other_Mix_Impact_GM_USD",
+     0 AS "Other_Mix_Impact_NS_Doc",
+     0 AS "Other_Mix_Impact_NS_Loc",
+     0 AS "Other_Mix_Impact_NS_USD",
+     "Overall_Loc_Doc_exchange_Rate",
+     "Overall_USD_Doc_exchange_Rate",
+     0 AS "Per_Cost_Impact_Doc",
+     0 AS "Per_Cost_Impact_Loc",
+     0 AS "Per_Cost_Impact_USD",
+     "PH1",
+     "PH2",
+     "PH3",
+     0 AS "Price_Impact_Net_Doc",
+     0 AS "Price_Impact_Net_Loc",
+     0 AS "Price_Impact_Net_USD",
+     0 AS "Price_Impact_Gross_Asphalt_Doc",
+     0 AS "Price_Impact_Gross_Asphalt_Loc",
+     0 AS "Price_Impact_Gross_Asphalt_USD",
+     0 AS "Price_Impact_Gross_Doc",
+     0 AS "Price_Impact_Gross_Loc",
+     0 AS "Price_Impact_Gross_USD",
+     0 AS "Price_Impact_Net_Asphalt_Doc",
+     0 AS "Price_Impact_Net_Asphalt_Loc",
+     0 AS "Price_Impact_Net_Asphalt_USD",
+     0 AS "Price_Impact_Pass_Through_Doc",
+     0 AS "Price_Impact_Pass_Through_Loc",
+     0 AS "Price_Impact_Pass_Through_USD",
+     "Product_Group",
+     "Product_Mix_Impact_CM_Doc",
+     "Product_Mix_Impact_CM_Loc",
+     "Product_Mix_Impact_CM_USD",
+     "Product_Mix_Impact_GM_Doc",
+     "Product_Mix_Impact_GM_Loc",
+     "Product_Mix_Impact_GM_USD",
+     "Product_Mix_Impact_NS_Doc",
+     "Product_Mix_Impact_NS_Loc",
+     "Product_Mix_Impact_NS_USD",
+     "Reason_Code",
+     "Sales_Region",
+     "Sales_Territory",
+     "Unit_of_Measure",
+     "USD_Doc_exchange_Rate",
+     "Volume_Impact_CM_Doc",
+     "Volume_Impact_CM_Loc",
+     "Volume_Impact_CM_USD",
+     "Volume_Impact_GM_Doc",
+     "Volume_Impact_GM_Loc",
+     "Volume_Impact_GM_USD",
+     "Volume_Impact_NS_Doc",
+     "Volume_Impact_NS_Loc",
+     "Volume_Impact_NS_USD"
+FROM :v_SP13_PVM_No_Base;
+
+
+v_tmpPriceVolumeMix = SELECT unionall.*,
+	IFNULL(pgt."Text",  unionall."Product_Group") 			AS "Product_Group_Desc",
+	IFNULL(cgt."Text",  unionall."Channel_Group") 			AS "Channel_Group_Desc",   
+	IFNULL(pht1."Text", unionall.PH1) 						AS "PH1_Desc",
+	IFNULL(pht2."Text", unionall.PH2) 						AS "PH2_Desc",
+	IFNULL(pht3."Text", unionall.PH3) 						AS "PH3_Desc",	
+	IFNULL(gcgt."Text", unionall."Global_Customer_Group") 	AS "Global_Customer_Group_Desc",
+	IFNULL(bgt."Text",  unionall."Business_Group") 			AS "Business_Group_Desc",
+	IFNULL(but."Text",  unionall."Business_Unit") 			AS "Business_Unit_Desc",
+	IFNULL(bst1."Text", unionall."Business_Segment") 		AS "Business_Segment_Desc",
+	IFNULL(bst2."Text", unionall."IC_Business_Segment") 	AS "IC_Business_Segment_Desc",
+	IFNULL(ct."Text",   unionall."Country") 				AS "Country_Desc",	
+	IFNULL(srt."Text",  unionall."Sales_Region") 			AS "Sales_Region_Desc",
+	IFNULL(stt."Text",  unionall."Sales_Territory") 		AS "Sales_Territory_Desc",
+	CASE WHEN  ("USD_Doc_exchange_Rate" <> 0 -- AND IFNULL("Overall_USD_Doc_exchange_Rate", 0) <> 0 )
+         AND ABS (("USD_Doc_exchange_Rate" - "Overall_USD_Doc_exchange_Rate") / NULLIF("Overall_USD_Doc_exchange_Rate", 0)) <= 0.12)
+         THEN '0'
+         ELSE '1' 
+    END AS "USD_Overall_Used_Flag",
+    CASE WHEN  ("Loc_Doc_exchange_Rate" <> 0 -- AND IFNULL("Overall_Loc_Doc_exchange_Rate", 0) <> 0 )
+         AND ABS (("Loc_Doc_exchange_Rate" - "Overall_Loc_Doc_exchange_Rate") / NULLIF("Overall_Loc_Doc_exchange_Rate", 0)) <= 0.12)
+         THEN '0'
+         ELSE '1' 
+    END AS "Loc_Overall_Used_Flag"
+FROM :v_unionall as unionall
+	LEFT OUTER JOIN ( SELECT "PVMPRDGRP", MIN("PVMPRDGRP___TXTLG")  AS "Text" 
+			            FROM "_SYS_BIC"."system-local.bw.bw2hana/PVMPRDGRP" 
+				    GROUP BY "PVMPRDGRP") 		     AS pgt  
+	ON unionall."Product_Group" = pgt."PVMPRDGRP"
+	LEFT OUTER JOIN ( SELECT "GSLSRG", 	  MIN("GSLSRG___TXTLG") 	AS "Text" 
+			            FROM "_SYS_BIC"."system-local.bw.bw2hana/GSLSRG"
+			        GROUP BY "GSLSRG") 	   			 AS srt 
+	ON unionall."Sales_Region" = srt."GSLSRG" 
+	LEFT OUTER JOIN ( SELECT "GSLSTR", 	  MIN("GSLSTR___TXTLG") 	AS "Text" 
+			          	FROM "_SYS_BIC"."system-local.bw.bw2hana/GSLSTR" 
+			        GROUP BY "GSLSTR")    		     AS stt 
+	ON unionall."Sales_Territory" = stt."GSLSTR" 
+	LEFT OUTER JOIN ( SELECT "PVMCUSGRP", MIN("PVMCUSGRP___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/PVMCUSGRP" 
+			        GROUP BY "PVMCUSGRP") 		     AS cgt 
+	ON unionall."Channel_Group" = cgt."PVMCUSGRP"
+	
+	----------- Before 3/5/2021 
+    /*
+	LEFT OUTER JOIN ( SELECT "GPRODHIER", MIN("GPRODHIER___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GPRODHIER" 
+			        GROUP BY "GPRODHIER")  		     AS pht1 
+	ON unionall.PH1 = pht1."GPRODHIER" 
+	LEFT OUTER JOIN ( SELECT "GPRODHIER", MIN("GPRODHIER___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GPRODHIER" 
+			        GROUP BY "GPRODHIER")  		     AS pht2 
+	ON unionall.PH2 = pht2."GPRODHIER"
+	LEFT OUTER JOIN ( SELECT "GPRODHIER", MIN("GPRODHIER___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GPRODHIER" 
+			        GROUP BY "GPRODHIER")  		     AS pht3 
+	ON unionall.PH3 = pht3."GPRODHIER"
+	*/
+	-------------Before 3/5/2021 
+
+----------- 3/5/2021 changes to read PH1, PH2, PH3 texts from GCUSFLD2, GCPGLVL2, GCPGLVL3 respecivitely for PAROC BART business segments 3176, 3177
+    -- Begin of PH1 texts
+	LEFT OUTER JOIN ( SELECT "GPRODHIER", MIN("GPRODHIER___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GPRODHIER" 
+			        GROUP BY "GPRODHIER" UNION ALL (SELECT DISTINCT "GCUSFLD2" AS "GPRODHIER", "GCUSFLD2___TXTLG" AS "Text"  FROM "_SYS_BIC"."system-local.bw.bw2hana/GMATERIAL")) AS pht1 
+	ON unionall.PH1 = pht1."GPRODHIER" 
+	-- end of PH1 Texts
+
+    -- Begin of PH2 Texts
+	
+	LEFT OUTER JOIN ( SELECT "GPRODHIER", MIN("GPRODHIER___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GPRODHIER" 
+			        GROUP BY "GPRODHIER" UNION ALL (SELECT DISTINCT "GCPGLVL2" AS "GPRODHIER", "GCPGLVL2___TXTLG" AS "Text" FROM "_SYS_BIC"."system-local.bw.bw2hana/GMATERIAL"))  AS pht2 
+	ON unionall.PH2 = pht2."GPRODHIER"
+	
+	--End of PH2 Texts
+    
+    -- Begin of PH3 Texts
+	LEFT OUTER JOIN ( SELECT "GPRODHIER", MIN("GPRODHIER___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GPRODHIER" 
+			        GROUP BY "GPRODHIER" UNION ALL (SELECT DISTINCT "GCPGLVL3" AS "GPRODHIER", "GCPGLVL3___TXTLG" AS "Text" FROM "_SYS_BIC"."system-local.bw.bw2hana/GMATERIAL"))  AS pht3 
+	ON unionall.PH3 = pht3."GPRODHIER"
+	
+	--End of PH3 Texts
+	
+	------------- 3/5/2021 end of changes to read PH1, PH2, PH3 texts
+
+   
+	LEFT OUTER JOIN ( SELECT "GGLCUSGRP", MIN("GGLCUSGRP___TXTLG")  AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GGLCUSGRP" 
+			        GROUP BY "GGLCUSGRP") 		     AS gcgt 
+	ON unionall."Global_Customer_Group" = gcgt."GGLCUSGRP"
+	LEFT OUTER JOIN ( SELECT "GBUSGRP",   MIN("GBUSGRP___TXTLG")    AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GBUSGRP"
+			        GROUP BY "GBUSGRP") 		     AS bgt 
+	ON unionall."Business_Group" = bgt."GBUSGRP"
+	LEFT OUTER JOIN ( SELECT "GBUSUNIT",  MIN("GBUSUNIT___TXTLG") 	AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GBUSUNIT"
+			        GROUP BY "GBUSUNIT") 		     AS but 
+	ON unionall."Business_Unit" = but."GBUSUNIT"
+	LEFT OUTER JOIN ( SELECT "GBUSSEG",   MIN("GBUSSEG___TXTLG") 	AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GBUSSEG" 
+			        GROUP BY "GBUSSEG") 		     AS bst1 
+	ON unionall."Business_Segment" = bst1."GBUSSEG"
+	LEFT OUTER JOIN ( SELECT "GBUSSEG",   MIN("GBUSSEG___TXTLG") 	AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana/GBUSSEG"
+			        GROUP BY "GBUSSEG") 			 AS bst2 
+	ON unionall."IC_Business_Segment" = bst2."GBUSSEG"
+	LEFT OUTER JOIN ( SELECT "0COUNTRY",  MIN("0COUNTRY___TXTLG") 	AS "Text" 
+			        	FROM "_SYS_BIC"."system-local.bw.bw2hana.0/COUNTRY" 
+			        GROUP BY "0COUNTRY") 			 AS ct 
+	ON unionall."Country" = ct."0COUNTRY";  
+
+v_PriceVolumeMix = SELECT
+    "AP_Contribution_Margin_Doc" / 1000 AS "AP_Contribution_Margin_Doc",
+    "AP_Contribution_Margin_Loc" / 1000 AS "AP_Contribution_Margin_Loc",
+    "AP_Contribution_Margin_USD" / 1000 AS "AP_Contribution_Margin_USD",
+    "AP_Cust_Frt_Doc"            / 1000 AS "AP_Cust_Frt_Doc",
+    "AP_Cust_Frt_Loc"            / 1000 AS "AP_Cust_Frt_Loc",
+    "AP_Cust_Frt_USD"            / 1000 AS "AP_Cust_Frt_USD",
+    "AP_Dir_Cost_Doc"            / 1000 AS "AP_Dir_Cost_Doc",
+    "AP_Dir_Cost_Loc"            / 1000 AS "AP_Dir_Cost_Loc",
+    "AP_Dir_Cost_USD"            / 1000 AS "AP_Dir_Cost_USD",
+    "AP_Gross_Margin_Doc"        / 1000 AS "AP_Gross_Margin_Doc",
+    "AP_Gross_Margin_Loc"        / 1000 AS "AP_Gross_Margin_Loc",
+    "AP_Gross_Margin_USD"        / 1000 AS "AP_Gross_Margin_USD",
+    "AP_Gross_Sales_Doc"         / 1000 AS "AP_Gross_Sales_Doc",
+    "AP_Gross_Sales_Loc"         / 1000 AS "AP_Gross_Sales_Loc",
+    "AP_Gross_Sales_USD"         / 1000 AS "AP_Gross_Sales_USD",
+    "AP_Material_Costs_Doc"      / 1000 AS "AP_Material_Costs_Doc",
+    "AP_Material_Costs_Loc"      / 1000 AS "AP_Material_Costs_Loc",
+    "AP_Material_Costs_USD"      / 1000 AS "AP_Material_Costs_USD",
+    "AP_Net_Sales_Doc"           / 1000 AS "AP_Net_Sales_Doc",
+    "AP_Net_Sales_Loc"           / 1000 AS "AP_Net_Sales_Loc",
+    "AP_Net_Sales_USD"           / 1000 AS "AP_Net_Sales_USD",
+    "AP_Other_Cost_of_Sales_Doc" / 1000 AS "AP_Other_Cost_of_Sales_Doc",
+    "AP_Other_Cost_of_Sales_Loc" / 1000 AS "AP_Other_Cost_of_Sales_Loc",
+    "AP_Other_Cost_of_Sales_USD" / 1000 AS "AP_Other_Cost_of_Sales_USD",
+    "AP_Other_Direct_Costs_Doc"  / 1000 AS "AP_Other_Direct_Costs_Doc",
+    "AP_Other_Direct_Costs_Loc"  / 1000 AS "AP_Other_Direct_Costs_Loc",
+    "AP_Other_Direct_Costs_USD"  / 1000 AS "AP_Other_Direct_Costs_USD",
+    "AP_Per_Cost_Doc"            / 1000 AS "AP_Per_Cost_Doc",
+    "AP_Per_Cost_Loc"            / 1000 AS "AP_Per_Cost_Loc",
+    "AP_Per_Cost_USD"            / 1000 AS "AP_Per_Cost_USD",
+    "AP_Reporting_Qty"           / 1000 AS "AP_Reporting_Qty",
+    "BP_Contribution_Margin_Doc" / 1000 AS "BP_Contribution_Margin_Doc",
+    "BP_Contribution_Margin_Loc" / 1000 AS "BP_Contribution_Margin_Loc",
+    "BP_Contribution_Margin_USD" / 1000 AS "BP_Contribution_Margin_USD",
+    "BP_Cust_Frt_Doc"            / 1000 AS "BP_Cust_Frt_Doc",
+    "BP_Cust_Frt_Loc"            / 1000 AS "BP_Cust_Frt_Loc",
+    "BP_Cust_Frt_USD"            / 1000 AS "BP_Cust_Frt_USD",
+    "BP_Dir_Cost_Doc"            / 1000 AS "BP_Dir_Cost_Doc",
+    "BP_Dir_Cost_Loc"            / 1000 AS "BP_Dir_Cost_Loc",
+    "BP_Dir_Cost_USD"            / 1000 AS "BP_Dir_Cost_USD",
+    "BP_Gross_Margin_Doc"        / 1000 AS "BP_Gross_Margin_Doc",
+    "BP_Gross_Margin_Loc"        / 1000 AS "BP_Gross_Margin_Loc",
+    "BP_Gross_Margin_USD"        / 1000 AS "BP_Gross_Margin_USD",
+    "BP_Gross_Sales_Doc"         / 1000 AS "BP_Gross_Sales_Doc",
+    "BP_Gross_Sales_Loc"         / 1000 AS "BP_Gross_Sales_Loc",
+    "BP_Gross_Sales_USD"         / 1000 AS "BP_Gross_Sales_USD",
+    "BP_Material_Costs_Doc"      / 1000 AS "BP_Material_Costs_Doc",
+    "BP_Material_Costs_Loc"      / 1000 AS "BP_Material_Costs_Loc",
+    "BP_Material_Costs_USD"      / 1000 AS "BP_Material_Costs_USD",
+    "BP_Net_Sales_Doc"           / 1000 AS "BP_Net_Sales_Doc",
+    "BP_Net_Sales_Loc"           / 1000 AS "BP_Net_Sales_Loc",
+    "BP_Net_Sales_USD"           / 1000 AS "BP_Net_Sales_USD",
+    "BP_Other_Cost_of_Sales_Doc" / 1000 AS "BP_Other_Cost_of_Sales_Doc",
+    "BP_Other_Cost_of_Sales_Loc" / 1000 AS "BP_Other_Cost_of_Sales_Loc",
+    "BP_Other_Cost_of_Sales_USD" / 1000 AS "BP_Other_Cost_of_Sales_USD",
+    "BP_Other_Direct_Costs_Doc"  / 1000 AS "BP_Other_Direct_Costs_Doc",
+    "BP_Other_Direct_Costs_Loc"  / 1000 AS "BP_Other_Direct_Costs_Loc",
+    "BP_Other_Direct_Costs_USD"  / 1000 AS "BP_Other_Direct_Costs_USD",
+    "BP_Per_Cost_Doc"            / 1000 AS "BP_Per_Cost_Doc",
+    "BP_Per_Cost_Loc"            / 1000 AS "BP_Per_Cost_Loc",
+    "BP_Per_Cost_USD"            / 1000 AS "BP_Per_Cost_USD",
+    "BP_Reporting_Qty"           / 1000 AS "BP_Reporting_Qty",
+    "Business_Group",
+    "Business_Segment",
+    "Business_Unit",
+    "Channel_Group",
+    "Contribution_Margin_Doc_OA",
+    "Contribution_Margin_Doc_PA",
+    "Contribution_Margin_Loc_OA",
+    "Contribution_Margin_Loc_PA",
+    "Contribution_Margin_USD_OA",
+    "Contribution_Margin_USD_PA",
+    "Country",
+    "Cur_Imp_CM_Loc"                  / 1000 AS "Cur_Imp_CM_Loc",
+    "Cur_Imp_CM_USD"                  / 1000 AS "Cur_Imp_CM_USD",
+    "Cur_Imp_Cust_Frt_Loc"            / 1000 AS "Cur_Imp_Cust_Frt_Loc",
+    "Cur_Imp_Cust_Frt_USD"            / 1000 AS "Cur_Imp_Cust_Frt_USD",
+    "Cur_Imp_Dir_Cost_Loc"            / 1000 AS "Cur_Imp_Dir_Cost_Loc",
+    "Cur_Imp_Dir_Cost_USD"            / 1000 AS "Cur_Imp_Dir_Cost_USD",
+    "Cur_Imp_GM_Loc"                  / 1000 AS "Cur_Imp_GM_Loc",
+    "Cur_Imp_GM_USD"                  / 1000 AS "Cur_Imp_GM_USD",
+    "Cur_Imp_Gross_Sales_Loc"         / 1000 AS "Cur_Imp_Gross_Sales_Loc",
+    "Cur_Imp_Gross_Sales_USD"         / 1000 AS "Cur_Imp_Gross_Sales_USD",
+    "Cur_Imp_NS_Loc"                  / 1000 AS "Cur_Imp_NS_Loc",
+    "Cur_Imp_NS_USD"                  / 1000 AS "Cur_Imp_NS_USD",
+    "Cur_Imp_Other_Cost_of_Sales_Loc" / 1000 AS "Cur_Imp_Other_Cost_of_Sales_Loc",
+    "Cur_Imp_Other_Cost_of_Sales_USD" / 1000 AS "Cur_Imp_Other_Cost_of_Sales_USD",
+    "Cur_Imp_Per_Cost_Loc"            / 1000 AS "Cur_Imp_Per_Cost_Loc",
+    "Cur_Imp_Per_Cost_USD"            / 1000 AS "Cur_Imp_Per_Cost_USD",
+    "Cust_Frt_Impact_Doc"             / 1000 AS "Cust_Frt_Impact_Doc",
+    "Cust_Frt_Impact_Loc"             / 1000 AS "Cust_Frt_Impact_Loc",
+    "Cust_Frt_Impact_USD"             / 1000 AS "Cust_Frt_Impact_USD",
+    "Customer_Mix_Impact_CM_Doc"      / 1000 AS "Customer_Mix_Impact_CM_Doc",
+    "Customer_Mix_Impact_CM_Loc"      / 1000 AS "Customer_Mix_Impact_CM_Loc",
+    "Customer_Mix_Impact_CM_USD"      / 1000 AS "Customer_Mix_Impact_CM_USD",
+    "Customer_Mix_Impact_GM_Doc"      / 1000 AS "Customer_Mix_Impact_GM_Doc",
+    "Customer_Mix_Impact_GM_Loc"      / 1000 AS "Customer_Mix_Impact_GM_Loc",
+    "Customer_Mix_Impact_GM_USD"      / 1000 AS "Customer_Mix_Impact_GM_USD",
+    "Customer_Mix_Impact_NS_Doc"      / 1000 AS "Customer_Mix_Impact_NS_Doc",
+    "Customer_Mix_Impact_NS_Loc"      / 1000 AS "Customer_Mix_Impact_NS_Loc",
+    "Customer_Mix_Impact_NS_USD"      / 1000 AS "Customer_Mix_Impact_NS_USD",
+    "Dir_Cost_Impact_Doc"             / 1000 AS "Dir_Cost_Impact_Doc",
+    "Dir_Cost_Impact_Loc"             / 1000 AS "Dir_Cost_Impact_Loc",
+    "Dir_Cost_Impact_USD"             / 1000 AS "Dir_Cost_Impact_USD",
+    "Document_currency",
+    "ES_Market",
+    "ES_sub_Market",
+    "Global_Customer_Group",
+    "Gross_Margin_Doc_OA",
+    "Gross_Margin_Doc_PA",
+    "Gross_Margin_Loc_OA",
+    "Gross_Margin_Loc_PA",
+    "Gross_Margin_USD_OA",
+    "Gross_Margin_USD_PA",
+    "IC_Business_Segment",
+    "Loc_Doc_exchange_Rate",
+    "Local_Currency",
+    "Net_Sales_Doc_OA",
+    "Net_Sales_Doc_PA",
+    "Net_Sales_Loc_OA",
+    "Net_Sales_Loc_PA",
+    "Net_Sales_Perceent_Doc"         / 1000 AS "Net_Sales_Perceent_Doc",
+    "Net_Sales_Perceent_Loc"         / 1000 AS "Net_Sales_Perceent_Loc",
+    "Net_Sales_Perceent_USD"         / 1000 AS "Net_Sales_Perceent_USD",
+    "Net_Sales_USD_OA",
+    "Net_Sales_USD_PA",
+    "Other_Cost_of_Sales_Impact_Doc" / 1000 AS "Other_Cost_of_Sales_Impact_Doc",
+    "Other_Cost_of_Sales_Impact_Loc" / 1000 AS "Other_Cost_of_Sales_Impact_Loc",
+    "Other_Cost_of_Sales_Impact_USD" / 1000 AS "Other_Cost_of_Sales_Impact_USD",
+    "Other_Mix_Impact_CM_Doc"        / 1000 AS "Other_Mix_Impact_CM_Doc",
+    "Other_Mix_Impact_CM_Loc"        / 1000 AS "Other_Mix_Impact_CM_Loc",
+    "Other_Mix_Impact_CM_USD"        / 1000 AS "Other_Mix_Impact_CM_USD",
+    "Other_Mix_Impact_GM_Doc"        / 1000 AS "Other_Mix_Impact_GM_Doc",
+    "Other_Mix_Impact_GM_Loc"        / 1000 AS "Other_Mix_Impact_GM_Loc",
+    "Other_Mix_Impact_GM_USD"        / 1000 AS "Other_Mix_Impact_GM_USD",
+    "Other_Mix_Impact_NS_Doc"        / 1000 AS "Other_Mix_Impact_NS_Doc",
+    "Other_Mix_Impact_NS_Loc"        / 1000 AS "Other_Mix_Impact_NS_Loc",
+    "Other_Mix_Impact_NS_USD"        / 1000 AS "Other_Mix_Impact_NS_USD",
+    "Overall_Loc_Doc_exchange_Rate",
+    "Overall_USD_Doc_exchange_Rate",
+    "Per_Cost_Impact_Doc"            / 1000 AS "Per_Cost_Impact_Doc",
+    "Per_Cost_Impact_Loc"            / 1000 AS "Per_Cost_Impact_Loc",
+    "Per_Cost_Impact_USD"            / 1000 AS "Per_Cost_Impact_USD",
+    "PH1",
+    "PH2",
+    "PH3",
+    "Price_Impact_Net_Doc"           / 1000 AS "Price_Impact_Net_Doc",
+    "Price_Impact_Net_Loc"           / 1000 AS "Price_Impact_Net_Loc",
+    "Price_Impact_Net_USD"           / 1000 AS "Price_Impact_Net_USD",
+    "Price_Impact_Gross_Asphalt_Doc" / 1000 AS "Price_Impact_Gross_Asphalt_Doc",
+    "Price_Impact_Gross_Asphalt_Loc" / 1000 AS "Price_Impact_Gross_Asphalt_Loc",
+    "Price_Impact_Gross_Asphalt_USD" / 1000 AS "Price_Impact_Gross_Asphalt_USD",
+    "Price_Impact_Gross_Doc"         / 1000 AS "Price_Impact_Gross_Doc",
+    "Price_Impact_Gross_Loc"         / 1000 AS "Price_Impact_Gross_Loc",
+    "Price_Impact_Gross_USD"         / 1000 AS "Price_Impact_Gross_USD",
+    "Price_Impact_Net_Asphalt_Doc"   / 1000 AS "Price_Impact_Net_Asphalt_Doc",
+    "Price_Impact_Net_Asphalt_Loc"   / 1000 AS "Price_Impact_Net_Asphalt_Loc",
+    "Price_Impact_Net_Asphalt_USD"   / 1000 AS "Price_Impact_Net_Asphalt_USD",
+    "Price_Impact_Pass_Through_Doc"  / 1000 AS "Price_Impact_Pass_Through_Doc",
+    "Price_Impact_Pass_Through_Loc"  / 1000 AS "Price_Impact_Pass_Through_Loc",
+    "Price_Impact_Pass_Through_USD"  / 1000 AS "Price_Impact_Pass_Through_USD",
+    "Product_Group",
+    "Product_Mix_Impact_CM_Doc"      / 1000 AS "Product_Mix_Impact_CM_Doc",
+    "Product_Mix_Impact_CM_Loc"      / 1000 AS "Product_Mix_Impact_CM_Loc",
+    "Product_Mix_Impact_CM_USD"      / 1000 AS "Product_Mix_Impact_CM_USD",
+    "Product_Mix_Impact_GM_Doc"      / 1000 AS "Product_Mix_Impact_GM_Doc",
+    "Product_Mix_Impact_GM_Loc"      / 1000 AS "Product_Mix_Impact_GM_Loc",
+    "Product_Mix_Impact_GM_USD"      / 1000 AS "Product_Mix_Impact_GM_USD",
+    "Product_Mix_Impact_NS_Doc"      / 1000 AS "Product_Mix_Impact_NS_Doc",
+    "Product_Mix_Impact_NS_Loc"      / 1000 AS "Product_Mix_Impact_NS_Loc",
+    "Product_Mix_Impact_NS_USD"      / 1000 AS "Product_Mix_Impact_NS_USD",
+    "Reason_Code",
+    "Sales_Region",
+    "Sales_Territory",
+    "Unit_of_Measure",
+    "USD_Doc_exchange_Rate",
+    "Volume_Impact_CM_Doc"           / 1000 AS "Volume_Impact_CM_Doc",
+    "Volume_Impact_CM_Loc"           / 1000 AS "Volume_Impact_CM_Loc",
+    "Volume_Impact_CM_USD"           / 1000 AS "Volume_Impact_CM_USD",
+    "Volume_Impact_GM_Doc"           / 1000 AS "Volume_Impact_GM_Doc",
+    "Volume_Impact_GM_Loc"           / 1000 AS "Volume_Impact_GM_Loc",
+    "Volume_Impact_GM_USD"           / 1000 AS "Volume_Impact_GM_USD",
+    "Volume_Impact_NS_Doc"           / 1000 AS "Volume_Impact_NS_Doc",
+    "Volume_Impact_NS_Loc"           / 1000 AS "Volume_Impact_NS_Loc",
+    "Volume_Impact_NS_USD"           / 1000 AS "Volume_Impact_NS_USD",
+    "Product_Group_Desc",
+    "Channel_Group_Desc",
+    "PH1_Desc",
+    "PH2_Desc",
+    "PH3_Desc",
+    "Global_Customer_Group_Desc",
+    "Business_Group_Desc",
+    "Business_Unit_Desc",
+    "Business_Segment_Desc",
+    "IC_Business_Segment_Desc",
+    "Country_Desc",
+    "Sales_Region_Desc",
+    "Sales_Territory_Desc",
+    "USD_Overall_Used_Flag",
+    "Loc_Overall_Used_Flag"
+FROM :v_tmpPriceVolumeMix;
+
+
+outtab = SELECT :RUNID AS "procid", CURRENT_TIMESTAMP AS "runtime", * 
+FROM :v_PriceVolumeMix 
+ORDER BY 
+	 "Product_Group",
+	 "Channel_Group",
+	 "PH1", 
+	 "PH2", 
+	 "PH3",
+	 "Global_Customer_Group",
+	 "ES_Market",
+	 "ES_sub_Market",
+	 "Business_Group",
+	 "Business_Unit",
+	 "Business_Segment",
+	 "IC_Business_Segment",
+	 "Sales_Region",
+	 "Sales_Territory",
+	 "Country",
+	 "Unit_of_Measure",
+	 "Local_Currency",
+	 "Document_currency",
+	 "Reason_Code";
+	
+END;
